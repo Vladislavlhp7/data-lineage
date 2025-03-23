@@ -1,0 +1,7 @@
+fastapi
+uvicorn
+sqlalchemy
+requests
+uvicorn
+python-multipart
+chardet

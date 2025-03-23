@@ -172,3 +172,17 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+# Node modules
+frontend/node_modules/
+
+# Application specific files
+backend/uploaded_files/
+backend/files.db
+backend/*.db
+*.db
+*.sqlite3
+
+# Build files
+frontend/build/
+frontend/dist/
