@@ -32,26 +32,33 @@ function Home() {
         setUploading(true);
         setUploadProgress(0);
         
-        const formData = new FormData();
-        formData.append('file', file);
-        
         try {
-            await axios.post('http://localhost:8000/upload', formData, {
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            // Simple logging to debug the request
+            console.log('Uploading file:', file.name);
+            
+            const response = await axios.post('http://localhost:8000/upload', formData, {
                 onUploadProgress: (progressEvent) => {
                     const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
                     setUploadProgress(percentCompleted);
+                    console.log(`Upload progress: ${percentCompleted}%`);
                 }
             });
             
-            // Simulate completion for small files (where progress might jump to 100 too quickly)
+            console.log('Upload response:', response);
+            
+            // Simulate completion for small files
             if (uploadProgress < 100) {
                 setUploadProgress(100);
-                await new Promise(resolve => setTimeout(resolve, 500)); // Show 100% for a moment
+                await new Promise(resolve => setTimeout(resolve, 500));
             }
             
             fetchFiles();
         } catch (error) {
             console.error("Error uploading file:", error);
+            alert(`Upload failed: ${error.response?.data?.detail || error.message}`);
         } finally {
             setUploading(false);
         }
@@ -68,6 +75,15 @@ function Home() {
             } catch (error) {
                 console.error("Error deleting file:", error);
             }
+        }
+    };
+
+    const handleFileSelect = async (fileId) => {
+        try {
+            // Fetch the file content before navigating
+            await axios.get(`http://localhost:8000/files/${fileId}`);
+        } catch (error) {
+            console.error(`Error pre-fetching file ${fileId}:`, error);
         }
     };
 
@@ -113,7 +129,12 @@ function Home() {
                             </div>
                         ) : (
                             uniqueFileList.map(file => (
-                                <Link to={`/file/${file.id}`} key={file.id} className="file-card-horizontal">
+                                <Link 
+                                    to={`/file/${file.id}`} 
+                                    key={file.id} 
+                                    className="file-card-horizontal"
+                                    onClick={() => handleFileSelect(file.id)}
+                                >
                                     <div className="file-icon">
                                         <i className="fas fa-file-alt"></i>
                                     </div>
