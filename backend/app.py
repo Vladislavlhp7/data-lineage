@@ -302,9 +302,10 @@ async def get_file_versions(file_id: int, db: SessionLocal = Depends(get_db)):
         if file is None:
             raise HTTPException(status_code=404, detail=f"File with id {file_id} not found")
         
+        # Change the ordering to ascending (oldest to newest)
         versions = db.query(FileVersion).filter(
             FileVersion.file_id == file_id
-        ).order_by(FileVersion.version_number.desc()).all()
+        ).order_by(FileVersion.version_number.asc()).all()  # Changed from desc() to asc()
         
         return [
             {

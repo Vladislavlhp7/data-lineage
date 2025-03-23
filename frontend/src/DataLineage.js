@@ -36,13 +36,14 @@ function DataLineage() {
             console.log('Versions received:', versionsResponse.data);
             
             if (versionsResponse.data && versionsResponse.data.length > 0) {
-                // Create version history from actual data
-                const versionHistory = versionsResponse.data.map(v => ({
-                    version: v.version,
-                    date: new Date(v.created_at).toLocaleDateString(),
-                    summary: v.summary || `Version ${v.version}`,
-                    // We'll fetch content on-demand when a version is selected
-                }));
+                // Create version history from actual data and sort chronologically (v1→v2)
+                const versionHistory = versionsResponse.data
+                    .sort((a, b) => a.version - b.version) // Sort by version number in ascending order
+                    .map(v => ({
+                        version: v.version,
+                        date: new Date(v.created_at).toLocaleDateString(),
+                        summary: v.summary || `Version ${v.version}`,
+                    }));
                 
                 setVersions(versionHistory);
                 setSelectedVersion(response.data.version);

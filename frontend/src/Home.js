@@ -121,7 +121,7 @@ function Home() {
             ) : (
                 <>
                     <h2 className="section-title">Your Files</h2>
-                    <div className="files-horizontal-scroll">
+                    <div className="files-grid">
                         {uniqueFileList.length === 0 ? (
                             <div className="no-files">
                                 <i className="fas fa-folder-open"></i>
@@ -132,7 +132,7 @@ function Home() {
                                 <Link 
                                     to={`/file/${file.id}`} 
                                     key={file.id} 
-                                    className="file-card-horizontal"
+                                    className="file-card"
                                     onClick={() => handleFileSelect(file.id)}
                                 >
                                     <div className="file-icon">
@@ -148,24 +148,6 @@ function Home() {
                                 </Link>
                             ))
                         )}
-                    </div>
-                    
-                    <h2 className="section-title">All Files</h2>
-                    <div className="files-grid">
-                        {files.map(file => (
-                            <Link to={`/file/${file.id}`} key={file.id} className="file-card">
-                                <div className="file-icon">
-                                    <i className="fas fa-file-alt"></i>
-                                </div>
-                                <div className="file-info">
-                                    <h3 className="file-name">{file.filename}</h3>
-                                    <span className="file-version">Version: {file.version}</span>
-                                </div>
-                                <button className="delete-btn" onClick={(e) => handleFileDelete(file.id, e)}>
-                                    <i className="fas fa-trash"></i>
-                                </button>
-                            </Link>
-                        ))}
                     </div>
                 </>
             )}
