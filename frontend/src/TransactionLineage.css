@@ -39,10 +39,42 @@
 /* Fixed Header */
 .fixed-header {
   position: fixed;
-  top: 0;
+  top: 4.5rem; /* Adjusted to ensure it is below the main app banner */
   left: 0;
   width: 100%;
   z-index: 100;
+  background-color: white;
+  padding: 0.5rem 1rem; /* Reduced padding for less height */
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.fixed-header .header-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.fixed-header .header-controls {
+  display: flex;
+  gap: 1rem;
+}
+
+.header-actions h1 {
+  font-size: 1.2rem; /* Reduced font size */
+  margin: 0;
+}
+
+.header-controls {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.header-controls.horizontal-buttons {
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-start;
+  align-items: center;
 }
 
 /* Header actions */
@@ -96,8 +128,8 @@
   padding: 0.5rem 1rem;
   display: flex;
   align-items: center;
-  margin: 0 1rem;
-  font-size: 0.9rem;
+  margin: 0;
+  font-size: 0.8rem; /* Reduced font size */
   box-shadow: 0 1px 5px rgba(0,0,0,0.05);
   border-radius: 0 0 8px 8px;
 }
@@ -304,8 +336,9 @@
 .visualization-content {
   padding: 6rem 2rem 2rem;
   min-width: 100%;
-  min-height: 100%;
+  min-height: 120vh; /* Increased height for data lineage */
   transition: transform 0.1s ease;
+  transform: translate(0, 0) scale(1); /* Ensure reset sets to default position and scale */
 }
 
 /* Visualization Content with Scale Transition */
@@ -1268,6 +1301,7 @@
   min-width: 100%;
   min-height: 100%;
   transition: transform 0.1s ease;
+  transform: translate(0, 0) scale(1); /* Ensure reset sets to default position and scale */
 }
 
 /* Flow section - top half */
@@ -1343,7 +1377,7 @@
 
 /* Reset position button */
 .reset-position-btn {
-  position: absolute;
+  position: fixed;
   bottom: 1rem;
   right: 1rem;
   background-color: rgba(255, 255, 255, 0.9);
@@ -1417,4 +1451,10 @@
 
 .completion-badge i {
   margin-right: 0.5rem;
+}
+
+.under-main-banner {
+  position: sticky; /* Ensures it sticks to the app-header */
+  top: 0rem; /* Matches the height of the app-header */
+  z-index: 99; /* Ensures it stays above other elements */
 }

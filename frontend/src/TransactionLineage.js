@@ -56,26 +56,27 @@ function TransactionLineage() {
 
   // Process the transaction to the next step
   const processStep = async () => {
-    if (currentStep >= steps.length - 1) return;
-    
+    if (currentStep >= steps.length) return; // Adjusted to prevent skipping steps
+
     setProcessingAnimation(true);
-    
+
     try {
-      // Call the process endpoint with current step
-      const response = await axios.get(`http://localhost:8000/transaction/${transactionId}/process?step_index=${currentStep}`);
-      
+      const response = await axios.get(
+        `http://localhost:8000/transaction/${transactionId}/process?step_index=${currentStep}`
+      );
+
       // Update the state with the response data
       setTransactionData(response.data.current_data);
-      setCurrentStep(currentStep + 1);
       setTransformations(response.data.transformations);
-      
-      // Use a short timeout to show animation
+
+      // Use a short timeout to show animation before updating the step
       setTimeout(() => {
+        setCurrentStep((prevStep) => prevStep + 1); // Increment step after animation
         setProcessingAnimation(false);
       }, 1000);
     } catch (error) {
-      console.error('Error processing transaction step:', error);
-      setError('Failed to process transaction step');
+      console.error("Error processing transaction step:", error);
+      setError("Failed to process transaction step");
       setProcessingAnimation(false);
     }
   };
@@ -89,7 +90,7 @@ function TransactionLineage() {
       setCurrentStep(0);
       setTransformations([]);
       setLoading(false);
-      // Reset drag position when resetting simulation
+      // Reset drag position to center the entire lineage
       setDragPosition({ x: 0, y: 0 });
     } catch (error) {
       console.error('Error resetting transaction:', error);
@@ -169,6 +170,20 @@ function TransactionLineage() {
     setScale(1);
   };
 
+  // Function to center the lineage visualization
+  const centerVisualization = () => {
+    const container = visualizationRef.current;
+    if (container) {
+      const { width, height } = container.getBoundingClientRect();
+      setDragPosition({ x: 0, y: 0 }); // Reset to the origin
+    }
+  };
+
+  useEffect(() => {
+    // Center the visualization on initial load
+    centerVisualization();
+  }, [visualizationRef]);
+
   if (loading) {
     return <div className="loading"><i className="fas fa-spinner fa-spin"></i> Loading transaction data...</div>;
   }
@@ -194,7 +209,8 @@ function TransactionLineage() {
           style={{
             transform: `translate(${dragPosition.x}px, ${dragPosition.y}px) scale(${scale})`,
             transformOrigin: 'center center',
-            cursor: isDragging ? 'grabbing' : 'grab'
+            cursor: isDragging ? 'grabbing' : 'grab',
+            height: '120vh' // Increased height for data lineage
           }}
         >
           {/* Upper Section - Process Flow */}
@@ -272,41 +288,11 @@ function TransactionLineage() {
               </div>
               <div className="lineage-connector"></div>
               
-              {/* Trade Validation */}
-              <div className={`lineage-node process ${currentStep >= 1 ? 'active' : ''}`}>
-                <div className="node-icon"><i className="fas fa-check-circle"></i></div>
-                <div className="node-text">Trade Validation</div>
-              </div>
-              <div className="lineage-connector"></div>
-              
-              {/* Validated Trade Data */}
-              <div className={`lineage-node data-field ${currentStep >= 1 ? 'active' : ''}`}>
-                <div className="node-icon"><i className="fas fa-file-alt"></i></div>
-                <div className="node-text">Validated Trade</div>
-                <div className="node-details">
-                  {currentStep >= 1 && (
-                    <ul className="field-list">
-                      <li className="added">validationStatus</li>
-                      <li className="added">validationTimestamp</li>
-                    </ul>
-                  )}
-                </div>
-              </div>
-              <div className="lineage-connector"></div>
-              
               {/* Trade Enrichment */}
               <div className={`lineage-node process ${currentStep >= 2 ? 'active' : ''}`}>
                 <div className="node-icon"><i className="fas fa-plus-circle"></i></div>
                 <div className="node-text">Trade Enrichment</div>
               </div>
-              
-              {/* External Market Data */}
-              <div className={`lineage-node source side-input ${currentStep >= 2 ? 'active' : ''}`}>
-                <div className="node-icon"><i className="fas fa-chart-line"></i></div>
-                <div className="node-text">Market Data</div>
-                <div className="side-connector"></div>
-              </div>
-              
               <div className="lineage-connector"></div>
               
               {/* Enriched Trade Data */}
@@ -397,19 +383,6 @@ function TransactionLineage() {
               </div>
             </div>
           </div>
-          
-          {/* Visual connections between the two graphs */}
-          <div className="graph-connections">
-            {steps.map((step, index) => (
-              index < steps.length && (
-                <div 
-                  key={`connection-${index}`} 
-                  className={`vertical-connection ${currentStep >= index ? 'active' : ''}`}
-                  style={{ left: `${(100 / (steps.length - 1)) * index}%` }}
-                ></div>
-              )
-            ))}
-          </div>
         </div>
         
         {/* Add zoom controls */}
@@ -425,23 +398,18 @@ function TransactionLineage() {
           </button>
         </div>
         
-        {/* Reset position button - shows when user has dragged */}
-        {(dragPosition.x !== 0 || dragPosition.y !== 0) && (
-          <button 
-            className="reset-position-btn"
-            onClick={() => setDragPosition({ x: 0, y: 0 })}
-          >
-            <i className="fas fa-crosshairs"></i> Reset Position
-          </button>
-        )}
+        {/* Reset position button */}
+        <button 
+          className="reset-position-btn"
+          onClick={centerVisualization}
+        >
+          <i className="fas fa-crosshairs"></i> Reset Position
+        </button>
       </div>
       
       {/* Fixed Header Controls */}
-      <div className="fixed-header">
-        <div className="header-actions">
-          <Link to="/" className="back-link">
-            <i className="fas fa-arrow-left"></i> Back to Home
-          </Link>
+      <div className="fixed-header under-main-banner">
+        <div className="header-content">
           <h1>Transaction Lineage Simulation</h1>
           <div className="header-controls">
             {currentStep < steps.length - 1 ? (
@@ -467,19 +435,9 @@ function TransactionLineage() {
             </button>
           </div>
         </div>
-
-        {/* Transaction ID display */}
-        <div className="transaction-id">
-          <span className="label">Transaction ID:</span>
-          <span className="value">{transactionId}</span>
-          <div className="current-step-chip">
-            <span className="step-name">{currentStepData.name}</span>
-            <span className="step-department">{currentStepData.department}</span>
-          </div>
-        </div>
       </div>
       
-      {/* Floating Data Panel - movable and minimizable */}
+      {/* Floating Data Panel */}
       <div 
         className={`floating-data-panel vertical-panel ${isDataPanelMinimized ? 'minimized' : ''}`}
         style={{
@@ -514,7 +472,6 @@ function TransactionLineage() {
                 </thead>
                 <tbody>
                   {transactionData && Object.entries(transactionData).map(([key, value]) => {
-                    // Determine if this field was transformed in the current step
                     const isNewField = transformations && transformations.some(
                       t => t.field === key && (t.action === 'added' || t.action === 'renamed')
                     );
