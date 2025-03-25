@@ -150,43 +150,83 @@ def print_bcbs_report(report_data):
         print(f"Total Market Risk Exposure: ${total_market_risk:,.2f} ({total_market_risk/total_notional*100:.2f}%)")
         print(f"Total Credit Risk Exposure: ${total_credit_risk:,.2f} ({total_credit_risk/total_notional*100:.2f}%)")
 
+def generate_multiple_trades(db_session, count=10):
+    """Generate multiple sample trades"""
+    trades = []
+    print(f"\nGenerating {count} sample trades:")
+    
+    for i in range(1, count + 1):
+        trade_id = f"T{10000 + i}"
+        trade = generate_sample_trade(db_session, trade_id)
+        trades.append(trade)
+        print(f"  ✓ [{i}/{count}] Created trade {trade.trade_id} with {trade.counterparty}")
+    
+    return trades
+
+def process_trades_batch(db_session, trades):
+    """Process all trades through the entire lifecycle"""
+    total = len(trades)
+    print(f"\nPromoting {total} trades through all processing stages:")
+    
+    lineages = []
+    for i, trade in enumerate(trades, 1):
+        lineage = promote_trade(db_session, trade.trade_id)
+        lineages.append(lineage)
+        
+        # Print progress
+        print(f"  ✓ [{i}/{total}] Processed {trade.trade_id} ({trade.counterparty})")
+    
+    return lineages
+
+def finalize_regulatory_reporting(db_session):
+    """Mark all regulatory reports as submitted"""
+    reports = db_session.query(RegulatoryReporting).all()
+    total = len(reports)
+    
+    print(f"\nFinalizing {total} regulatory reports:")
+    
+    for i, report in enumerate(reports, 1):
+        report.is_submitted = True
+        print(f"  ✓ [{i}/{total}] Marked report for settlement ID {report.settlement_id} as submitted")
+    
+    db_session.commit()
 
 def main():
-    """Main function to test the bank digital twin"""
-    print("\n🏦 BANK DIGITAL TWIN - TRANSACTION LINEAGE DEMO")
-    print("="*50)
+    """Main function to test the bank digital twin with multiple transactions"""
+    print("\n🏦 BANK DIGITAL TWIN - MULTI-TRANSACTION LINEAGE DEMO")
+    print("="*60)
+    
+    # Number of trades to generate
+    num_trades = 10
     
     # Setup the database
-    print("\n[1/5] Setting up in-memory database...")
+    print("\n[1/4] Setting up in-memory database...")
     db_session = setup_database()
     
-    # Generate a sample trade
-    print("\n[2/5] Generating sample trade...")
-    trade = generate_sample_trade(db_session, "T12345")
-    print(f"       Created trade {trade.trade_id} with {trade.counterparty}")
+    # Generate multiple sample trades
+    print("\n[2/4] Generating sample trades...")
+    trades = generate_multiple_trades(db_session, num_trades)
     
-    # Promote the trade through all stages
-    print("\n[3/5] Promoting trade through all processing stages...")
-    lineage = promote_trade(db_session, trade.trade_id)
+    # Process all trades through the lineage
+    print("\n[3/4] Processing trades through all stages...")
+    lineages = process_trades_batch(db_session, trades)
     
-    # Mark the regulatory report as submitted (normally this would be a separate process)
-    print("\n[4/5] Finalizing regulatory reporting...")
-    reg_report = db_session.query(RegulatoryReporting).first()
-    if reg_report:
-        reg_report.is_submitted = True
-        db_session.commit()
+    # Finalize all regulatory reports
+    print("\n[4/4] Finalizing regulatory reporting...")
+    finalize_regulatory_reporting(db_session)
     
-    # Generate and print reports
-    print("\n[5/5] Generating reports...")
+    # Generate reports
+    print("\n[5/4] Generating reports...")
     
-    # Print the lineage
-    print_lineage_summary(lineage)
+    # Print a detailed lineage for the first trade as an example
+    print("\n📋 EXAMPLE TRADE LINEAGE (First Trade)")
+    print_lineage_summary(lineages[0])
     
-    # Print the BCBS report
+    # Generate and print the BCBS report for all trades
     report_data = generate_bcbs_report(db_session)
     print_bcbs_report(report_data)
     
-    print("\n✅ Demo completed successfully!\n")
+    print(f"\n✅ Demo completed successfully! Processed {num_trades} trades.\n")
 
 
 if __name__ == "__main__":
