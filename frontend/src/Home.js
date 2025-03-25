@@ -99,12 +99,35 @@ function Home() {
 
     return (
         <div className="home-container">
-            <h1>File Repository</h1>
-            <div className="upload-section">
-                <label className="file-upload-btn">
-                    <i className="fas fa-cloud-upload-alt"></i> Upload New File
-                    <input type="file" onChange={handleFileUpload} disabled={uploading} />
-                </label>
+            <h1>Data Lineage Application</h1>
+            
+            <div className="demo-options">
+                <div className="demo-card">
+                    <h2>File Repository</h2>
+                    <p>Upload and track changes to files over time</p>
+                    <div className="upload-section">
+                        <label className="file-upload-btn">
+                            <i className="fas fa-cloud-upload-alt"></i> Upload New File
+                            <input 
+                                type="file" 
+                                onChange={handleFileUpload} 
+                                disabled={uploading}
+                                accept=".txt,.docx,.md,.json,.csv,.py,.js,.html,.css" 
+                            />
+                        </label>
+                        <div className="supported-formats">
+                            Supported formats: TXT, DOCX, MD, JSON, CSV, and code files
+                        </div>
+                    </div>
+                </div>
+                
+                <div className="demo-card">
+                    <h2>Transaction Lineage</h2>
+                    <p>Visualize how a transaction flows through different departments</p>
+                    <Link to="/transaction" className="demo-btn">
+                        <i className="fas fa-chart-network"></i> Launch Demo
+                    </Link>
+                </div>
             </div>
             
             {uploading && (

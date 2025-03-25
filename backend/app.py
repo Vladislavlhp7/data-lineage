@@ -12,6 +12,21 @@ import chardet
 from datetime import datetime
 import shutil
 from typing import List, Optional
+import io
+import random
+import docx  # Import for DOCX support
+from dotenv import load_dotenv  # Add this import
+
+# Add these imports for transaction simulation
+import uuid
+import time
+from datetime import datetime, timedelta
+import json
+from typing import Dict, List, Any, Optional
+from pydantic import BaseModel
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Setup FastAPI app
 app = FastAPI(title="Data Lineage API")
@@ -97,18 +112,48 @@ def generate_diff(old_content, new_content):
 
 def summarize_changes(changes):
     """Summarize changes between two versions of a file"""
-    change_text = "\n".join(changes)
+    # Simple summary without using Mistral API
+    if not changes:
+        return "No changes detected."
     
-    # Mistral API call commented out for now
-    # response = requests.post(
-    #     "https://api.mistral.ai/summarize",
-    #     json={"text": change_text},
-    #     headers={"Authorization": "Bearer YOUR_API_KEY"}
-    # )
-    # summary = response.json()
-    # return summary['summary']
+    # Generate a simple summary based on the number and type of changes
+    additions = sum(1 for line in changes if line.startswith('+'))
+    deletions = sum(1 for line in changes if line.startswith('-'))
     
-    return "This is a dummy summary of the changes."
+    if additions == 0 and deletions == 0:
+        return "File was modified but no text content changed."
+    
+    summary_parts = []
+    if additions > 0:
+        summary_parts.append(f"Added {additions} line{'s' if additions != 1 else ''}")
+    if deletions > 0:
+        summary_parts.append(f"Removed {deletions} line{'s' if deletions != 1 else ''}")
+    
+    summary = " and ".join(summary_parts)
+    if len(changes) > 10:
+        summary += ". Substantial changes were made to the file."
+    
+    return summary
+
+def extract_file_content(file_content, filename, encoding='utf-8'):
+    """Extract text content from files of different formats"""
+    # Check file extension
+    _, file_extension = os.path.splitext(filename.lower())
+    
+    if file_extension == '.docx':
+        # Process DOCX file
+        try:
+            doc = docx.Document(io.BytesIO(file_content))
+            return "\n".join([paragraph.text for paragraph in doc.paragraphs])
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Error processing DOCX file: {str(e)}")
+    else:
+        # Process as text file with encoding detection
+        try:
+            detected_encoding = chardet.detect(file_content)['encoding'] or encoding
+            return file_content.decode(detected_encoding)
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Error decoding text file: {str(e)}")
 
 # API Endpoints
 @app.post("/upload")
@@ -116,8 +161,9 @@ async def upload_file(file: UploadFile = FastAPIFile(...), db: SessionLocal = De
     """Upload a new file or a new version of an existing file"""
     try:
         content = await file.read()
-        encoding = chardet.detect(content)['encoding'] or 'utf-8'  # Provide a default encoding
-        content_str = content.decode(encoding)
+        
+        # Extract content based on file type
+        content_str = extract_file_content(content, file.filename)
         
         # Create directory for this file
         file_dir = ensure_file_directory(file.filename)
@@ -125,13 +171,13 @@ async def upload_file(file: UploadFile = FastAPIFile(...), db: SessionLocal = De
         # Check if file with same name already exists
         existing_file = db.query(FileModel).filter(FileModel.filename == file.filename).first()
         
-        if existing_file:
+        if (existing_file):
             # Create new version of existing file
             version_number = existing_file.latest_version + 1
             existing_file.latest_version = version_number
             
             # Save content to version-specific file
-            storage_path = save_file_content(file_dir, version_number, content_str, encoding)
+            storage_path = save_file_content(file_dir, version_number, content_str)
             
             # Create new version record
             new_version = FileVersion(
@@ -149,7 +195,7 @@ async def upload_file(file: UploadFile = FastAPIFile(...), db: SessionLocal = De
             db.flush()  # To get the new file ID
             
             # Save content to version-specific file
-            storage_path = save_file_content(file_dir, 1, content_str, encoding)
+            storage_path = save_file_content(file_dir, 1, content_str)
             
             # Create initial version record
             new_version = FileVersion(
@@ -257,7 +303,7 @@ async def list_files(db: SessionLocal = Depends(get_db)):
             FileVersion.version_number == file.latest_version
         ).first()
         
-        if latest_version:
+        if (latest_version):
             result.append({
                 "id": file.id,
                 "filename": file.filename,
@@ -343,6 +389,296 @@ async def get_file_version(file_id: int, version_number: int, db: SessionLocal =
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error retrieving file version: {str(e)}")
+
+# Add Transaction Models
+class TransactionStep(BaseModel):
+    id: str
+    name: str
+    department: str
+    description: str
+    
+class TransactionTransformation(BaseModel):
+    field: str
+    action: str
+    description: str
+    
+class TransactionSimulationResponse(BaseModel):
+    step_id: str
+    step_name: str
+    step_index: int
+    department: str
+    description: str
+    current_data: Dict[str, Any]
+    transformations: List[TransactionTransformation]
+    progress: float
+    is_complete: bool
+    next_step: Optional[str] = None
+
+# Transaction simulation endpoints
+@app.get("/transaction/steps")
+async def get_transaction_steps():
+    """Get all steps in the transaction process"""
+    return transaction_steps
+
+@app.get("/transaction/init")
+async def init_transaction():
+    """Initialize a new transaction with random data"""
+    transaction_id = f"T-{uuid.uuid4().hex[:8].upper()}"
+    
+    # Create sample initial transaction data
+    transaction = {
+        "tradeId": transaction_id,
+        "clientId": f"C-{100000 + int(random.random() * 900000)}",
+        "securityId": f"US-{10000 + int(random.random() * 90000)}",
+        "quantity": int(1000 + random.random() * 9000),
+        "price": round(50 + random.random() * 950, 2),
+        "tradeDate": (datetime.now()).strftime("%Y-%m-%d"),
+        "trader": "John Smith"
+    }
+    
+    # Store in memory (would be in database in production)
+    # In a real app, you'd store this in Redis or a database
+    active_transactions[transaction_id] = {
+        "data": transaction,
+        "current_step": 0,
+        "created_at": datetime.now().isoformat()
+    }
+    
+    return {
+        "transaction_id": transaction_id,
+        "initial_data": transaction,
+        "step": 0,
+        "total_steps": len(transaction_steps)
+    }
+
+@app.get("/transaction/{transaction_id}/process")
+async def process_transaction_step(transaction_id: str, step_index: int = None):
+    """Process a transaction step"""
+    # Check if transaction exists
+    if transaction_id not in active_transactions:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+    
+    transaction = active_transactions[transaction_id]
+    
+    # If step_index is provided, validate it
+    if step_index is not None:
+        if step_index < 0 or step_index >= len(transaction_steps):
+            raise HTTPException(status_code=400, detail="Invalid step index")
+        # Update the current step if valid
+        transaction["current_step"] = step_index
+    else:
+        # Use the current step
+        step_index = transaction["current_step"]
+    
+    # Check if we've reached the end
+    if step_index >= len(transaction_steps):
+        return {
+            "is_complete": True,
+            "message": "Transaction processing complete"
+        }
+    
+    # Get the current step
+    current_step = transaction_steps[step_index]
+    
+    # Apply transformations for this step
+    apply_transformations(transaction, step_index)
+    
+    # Get transformation definitions for this step
+    transformations = []
+    if step_index > 0:  # No transformations for the first step
+        transformations = step_transformations.get(current_step["id"], [])
+    
+    # Create the response
+    response = {
+        "step_id": current_step["id"],
+        "step_name": current_step["name"],
+        "step_index": step_index,
+        "department": current_step["department"],
+        "description": current_step["description"],
+        "current_data": transaction["data"],
+        "transformations": transformations,
+        "progress": (step_index + 1) / len(transaction_steps) * 100,
+        "is_complete": step_index == len(transaction_steps) - 1
+    }
+    
+    # If there's a next step, include it
+    if step_index < len(transaction_steps) - 1:
+        response["next_step"] = transaction_steps[step_index + 1]["id"]
+        
+    # If not the last step, increment the current step
+    if step_index < len(transaction_steps) - 1:
+        transaction["current_step"] = step_index + 1
+    
+    return response
+
+@app.get("/transaction/{transaction_id}/reset")
+async def reset_transaction(transaction_id: str):
+    """Reset a transaction to the initial state"""
+    # Check if transaction exists
+    if transaction_id not in active_transactions:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+    
+    # Get the basic transaction info and reset to step 0
+    transaction = active_transactions[transaction_id]
+    
+    # Reset to initial step
+    transaction["current_step"] = 0
+    
+    # Reset the data to initial values
+    transaction["data"] = {
+        "tradeId": transaction["data"]["tradeId"],
+        "clientId": transaction["data"]["clientId"],
+        "securityId": transaction["data"]["securityId"],
+        "quantity": transaction["data"]["quantity"],
+        "price": transaction["data"]["price"],
+        "tradeDate": transaction["data"]["tradeDate"],
+        "trader": transaction["data"]["trader"]
+    }
+    
+    return {
+        "message": "Transaction reset successfully",
+        "transaction_id": transaction_id,
+        "current_step": 0,
+        "data": transaction["data"]
+    }
+
+# In-memory storage for active transactions (would use DB in production)
+active_transactions = {}
+
+# Transaction step definitions
+transaction_steps = [
+    {
+        "id": "trade-capture",
+        "name": "Trade Capture",
+        "department": "Front Office",
+        "description": "Initial trade details captured from the trading desk"
+    },
+    {
+        "id": "trade-validation",
+        "name": "Trade Validation",
+        "department": "Middle Office",
+        "description": "Validating trade details against market data and rules"
+    },
+    {
+        "id": "trade-enrichment",
+        "name": "Trade Enrichment",
+        "department": "Middle Office",
+        "description": "Enriching trade with additional market and reference data"
+    },
+    {
+        "id": "risk-calculation",
+        "name": "Risk Calculation",
+        "department": "Risk Management",
+        "description": "Calculating risk metrics for the trade"
+    },
+    {
+        "id": "settlement-prep",
+        "name": "Settlement Preparation",
+        "department": "Back Office",
+        "description": "Preparing settlement instructions"
+    },
+    {
+        "id": "regulatory-reporting",
+        "name": "Regulatory Reporting",
+        "department": "Compliance",
+        "description": "Preparing data for regulatory reporting"
+    }
+]
+
+# Transformations for each step
+step_transformations = {
+    "trade-validation": [
+        {"field": "validationStatus", "action": "added", "description": "Validation result status"},
+        {"field": "validationTimestamp", "action": "added", "description": "Time of validation"}
+    ],
+    "trade-enrichment": [
+        {"field": "securityName", "action": "added", "description": "Security name from reference data"},
+        {"field": "marketValue", "action": "added", "description": "Calculated from price and quantity"},
+        {"field": "currency", "action": "added", "description": "Currency code from reference data"},
+        {"field": "exchangeRate", "action": "added", "description": "Current exchange rate"},
+        {"field": "settlementDate", "action": "added", "description": "Calculated settlement date"}
+    ],
+    "risk-calculation": [
+        {"field": "varValue", "action": "added", "description": "Value at Risk calculation"},
+        {"field": "deltaValue", "action": "added", "description": "Delta sensitivity"},
+        {"field": "gammaValue", "action": "added", "description": "Gamma sensitivity"}
+    ],
+    "settlement-prep": [
+        {"field": "valueCurrency", "action": "renamed", "description": "Renamed from currency for clarity"},
+        {"field": "settlementCurrency", "action": "added", "description": "Currency for settlement"},
+        {"field": "settlementInstructions", "action": "added", "description": "Instructions for settlement"},
+        {"field": "accountDetails", "action": "added", "description": "Account information for settlement"}
+    ],
+    "regulatory-reporting": [
+        {"field": "securityType", "action": "added", "description": "Type of security for reporting"},
+        {"field": "tradingDesk", "action": "added", "description": "Trading desk information"},
+        {"field": "reportingStatus", "action": "added", "description": "Status of regulatory reporting"},
+        {"field": "reportedTimestamp", "action": "added", "description": "Time of reporting"},
+        {"field": "regulatoryId", "action": "added", "description": "ID assigned by regulatory system"}
+    ]
+}
+
+def apply_transformations(transaction, step_index):
+    """Apply transformations for the given step to the transaction data"""
+    if step_index == 0:  # No transformations for the first step
+        return
+        
+    current_step = transaction_steps[step_index]
+    step_id = current_step["id"]
+    transformations = step_transformations.get(step_id, [])
+    
+    for transform in transformations:
+        field = transform["field"]
+        action = transform["action"]
+        
+        if action == "added":
+            # Add new fields based on field name
+            if field == "validationStatus":
+                transaction["data"][field] = "VALID"
+            elif field == "validationTimestamp":
+                transaction["data"][field] = datetime.now().isoformat()
+            elif field == "securityName":
+                transaction["data"][field] = "Sample Corp Common Stock"
+            elif field == "marketValue":
+                price = transaction["data"]["price"]
+                quantity = transaction["data"]["quantity"]
+                transaction["data"][field] = round(price * quantity, 2)
+            elif field == "currency":
+                transaction["data"][field] = "USD"
+            elif field == "exchangeRate":
+                transaction["data"][field] = 1.0
+            elif field == "settlementDate":
+                trade_date = datetime.strptime(transaction["data"]["tradeDate"], "%Y-%m-%d")
+                settlement_date = trade_date + timedelta(days=2)  # T+2 settlement
+                transaction["data"][field] = settlement_date.strftime("%Y-%m-%d")
+            elif field == "varValue":
+                market_value = transaction["data"].get("marketValue", 0)
+                transaction["data"][field] = round(market_value * 0.05, 2)
+            elif field == "deltaValue":
+                transaction["data"][field] = 0.65
+            elif field == "gammaValue":
+                transaction["data"][field] = 0.12
+            elif field == "settlementCurrency":
+                transaction["data"][field] = "USD"
+            elif field == "settlementInstructions":
+                transaction["data"][field] = "SWIFT: BKCHGB2L"
+            elif field == "accountDetails":
+                transaction["data"][field] = f"ACCT: {74000000 + int(random.random() * 999999)}"
+            elif field == "securityType":
+                transaction["data"][field] = "STOCK"
+            elif field == "tradingDesk":
+                transaction["data"][field] = "EQUITY-TRADING-1"
+            elif field == "reportingStatus":
+                transaction["data"][field] = "REPORTED"
+            elif field == "reportedTimestamp":
+                transaction["data"][field] = datetime.now().isoformat()
+            elif field == "regulatoryId":
+                transaction["data"][field] = f"REG-{10000 + int(random.random() * 90000)}"
+        elif action == "renamed":
+            # Handle renamed fields
+            if field == "valueCurrency" and "currency" in transaction["data"]:
+                transaction["data"][field] = transaction["data"]["currency"]
+                del transaction["data"]["currency"]
 
 if __name__ == '__main__':
     import uvicorn

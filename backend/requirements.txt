@@ -2,6 +2,7 @@ fastapi
 uvicorn
 sqlalchemy
 requests
-uvicorn
 python-multipart
 chardet
+python-docx
+python-dotenv

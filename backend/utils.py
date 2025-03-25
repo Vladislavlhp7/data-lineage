@@ -1,6 +1,8 @@
 import os
 import shutil
 import difflib
+import io
+import docx
 
 def ensure_file_directory(filename, upload_folder):
     """Create directory for a file if it doesn't exist"""
@@ -18,6 +20,14 @@ def save_file_content(file_dir, version_number, content, encoding='utf-8'):
     with open(storage_path, "w", encoding=encoding) as f:
         f.write(content)
     return storage_path
+
+def extract_docx_text(docx_bytes):
+    """Extract text from a DOCX file"""
+    try:
+        doc = docx.Document(io.BytesIO(docx_bytes))
+        return "\n".join([paragraph.text for paragraph in doc.paragraphs])
+    except Exception as e:
+        raise Exception(f"Error processing DOCX: {str(e)}")
 
 def delete_file_directory(file_dir):
     """Delete a file directory and all its versions"""
