@@ -56,7 +56,7 @@ function TransactionLineage() {
 
   // Process the transaction to the next step
   const processStep = async () => {
-    if (currentStep >= steps.length) return; // Adjusted to prevent skipping steps
+    if (currentStep >= steps.length - 1) return; // Prevent processing beyond the last step
 
     setProcessingAnimation(true);
 
@@ -65,13 +65,13 @@ function TransactionLineage() {
         `http://localhost:8000/transaction/${transactionId}/process?step_index=${currentStep}`
       );
 
-      // Update the state with the response data
+      // Update transaction data and transformations
       setTransactionData(response.data.current_data);
       setTransformations(response.data.transformations);
 
-      // Use a short timeout to show animation before updating the step
+      // Increment step after animation
       setTimeout(() => {
-        setCurrentStep((prevStep) => prevStep + 1); // Increment step after animation
+        setCurrentStep((prevStep) => prevStep + 1);
         setProcessingAnimation(false);
       }, 1000);
     } catch (error) {
@@ -172,10 +172,20 @@ function TransactionLineage() {
 
   // Function to center the lineage visualization
   const centerVisualization = () => {
-    const container = visualizationRef.current;
-    if (container) {
-      const { width, height } = container.getBoundingClientRect();
-      setDragPosition({ x: 0, y: 0 }); // Reset to the origin
+    setDragPosition({ x: 0, y: 0 }); // Reset to the origin
+  };
+
+  // Enable scrolling with the mouse pad
+  const handleWheel = (e) => {
+    if (e.ctrlKey) {
+      // Zoom in/out with Ctrl + Scroll
+      handleZoom(e.deltaY < 0);
+    } else {
+      // Scroll the view
+      setDragPosition((prev) => ({
+        x: prev.x - e.deltaX,
+        y: prev.y - e.deltaY,
+      }));
     }
   };
 
@@ -194,12 +204,49 @@ function TransactionLineage() {
 
   const currentStepData = steps[currentStep] || {};
 
+  // Ensure proper rendering of transaction steps
+  const renderTransactionSteps = () => {
+    return steps.map((step, index) => (
+      <React.Fragment key={step.id}>
+        <div
+          className={`flow-node ${index === currentStep ? 'active' : ''} ${index < currentStep ? 'completed' : ''}`}
+          title={step.description}
+        >
+          <div className="node-content">
+            <div className="node-icon">
+              {index < currentStep ? (
+                <i className="fas fa-check"></i>
+              ) : (
+                <span className="step-number">{index + 1}</span>
+              )}
+            </div>
+            <div className="node-label">
+              <div className="step-name">{step.name}</div>
+              <div className="department">{step.department}</div>
+            </div>
+          </div>
+        </div>
+        {index < steps.length - 1 && (
+          <div className={`flow-connector ${index < currentStep ? 'completed' : ''} ${processingAnimation && index === currentStep ? 'processing' : ''}`}>
+            <div className="connector-line"></div>
+            {processingAnimation && index === currentStep && (
+              <div className="processing-animation">
+                <i className="fas fa-circle"></i>
+              </div>
+            )}
+          </div>
+        )}
+      </React.Fragment>
+    ));
+  };
+
   return (
     <div 
       className="transaction-lineage full-width"
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseLeave}
+      onWheel={handleWheel} // Enable scrolling with the mouse pad
     >
       {/* Main playground background with visualization */}
       <div className="lineage-playground" onMouseDown={handleMouseDown}>
@@ -210,48 +257,12 @@ function TransactionLineage() {
             transform: `translate(${dragPosition.x}px, ${dragPosition.y}px) scale(${scale})`,
             transformOrigin: 'center center',
             cursor: isDragging ? 'grabbing' : 'grab',
-            height: '120vh' // Increased height for data lineage
           }}
         >
-          {/* Upper Section - Process Flow */}
           <div className="flow-section">
             <div className="section-label">Transaction Process Flow</div>
-            <div className="transaction-flow">
-              {steps.map((step, index) => (
-                <React.Fragment key={step.id}>
-                  <div 
-                    className={`flow-node ${index === currentStep ? 'active' : ''} ${index < currentStep ? 'completed' : ''}`}
-                    title={step.description}
-                  >
-                    <div className="node-content">
-                      <div className="node-icon">
-                        {index < currentStep ? (
-                          <i className="fas fa-check"></i>
-                        ) : (
-                          <span className="step-number">{index + 1}</span>
-                        )}
-                      </div>
-                      <div className="node-label">
-                        <div className="step-name">{step.name}</div>
-                        <div className="department">{step.department}</div>
-                      </div>
-                    </div>
-                  </div>
-                  {index < steps.length - 1 && (
-                    <div className={`flow-connector ${index < currentStep ? 'completed' : ''} ${processingAnimation && index === currentStep ? 'processing' : ''}`}>
-                      <div className="connector-line"></div>
-                      {processingAnimation && index === currentStep && (
-                        <div className="processing-animation">
-                          <i className="fas fa-circle"></i>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </React.Fragment>
-              ))}
-            </div>
+            <div className="transaction-flow">{renderTransactionSteps()}</div>
           </div>
-
           {/* Lower Section - Data Lineage Graph */}
           <div className="lineage-section">
             <div className="section-label">Data Lineage Graph</div>

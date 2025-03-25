@@ -34,6 +34,9 @@
   top: 0;
   left: 0;
   overflow: hidden;
+  scroll-behavior: smooth; /* Enable smooth scrolling */
+  overflow: auto; /* Allow scrolling in all directions */
+  overscroll-behavior: none; /* Prevent scroll chaining to the playground */
 }
 
 /* Fixed Header */
@@ -221,6 +224,8 @@
   height: calc(100% - 3rem);
   overflow-y: auto;
   overflow-x: hidden;
+  overscroll-behavior: contain; /* Prevent scrolling the playground */
+  pointer-events: auto; /* Ensure interaction is limited to the panel */
 }
 
 .floating-data-panel.vertical-panel .minimize-btn i {
