@@ -34,11 +34,11 @@ function TransactionLineage() {
     const initializeTransaction = async () => {
       setLoading(true);
       try {
-        // First get all steps
+        // Fetch transaction steps from the backend
         const stepsResponse = await axios.get('http://localhost:8000/transaction/steps');
         setSteps(stepsResponse.data);
         
-        // Then initialize a new transaction
+        // Initialize a new transaction
         const initResponse = await axios.get('http://localhost:8000/transaction/init');
         setTransactionId(initResponse.data.transaction_id);
         setTransactionData(initResponse.data.initial_data);

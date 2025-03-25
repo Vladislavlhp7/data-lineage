@@ -414,12 +414,6 @@ class TransactionSimulationResponse(BaseModel):
     is_complete: bool
     next_step: Optional[str] = None
 
-# Transaction simulation endpoints
-@app.get("/transaction/steps")
-async def get_transaction_steps():
-    """Get all steps in the transaction process"""
-    return transaction_steps
-
 @app.get("/transaction/init")
 async def init_transaction():
     """Initialize a new transaction with random data"""
@@ -448,7 +442,7 @@ async def init_transaction():
         "transaction_id": transaction_id,
         "initial_data": transaction,
         "step": 0,
-        "total_steps": len(transaction_steps)
+        "total_steps": len(transaction_data["steps"])
     }
 
 @app.get("/transaction/{transaction_id}/process")
@@ -462,7 +456,7 @@ async def process_transaction_step(transaction_id: str, step_index: int = None):
     
     # If step_index is provided, validate it
     if step_index is not None:
-        if step_index < 0 or step_index >= len(transaction_steps):
+        if step_index < 0 or step_index >= len(transaction_data["steps"]):
             raise HTTPException(status_code=400, detail="Invalid step index")
         # Update the current step if valid
         transaction["current_step"] = step_index
@@ -471,14 +465,14 @@ async def process_transaction_step(transaction_id: str, step_index: int = None):
         step_index = transaction["current_step"]
     
     # Check if we've reached the end
-    if step_index >= len(transaction_steps):
+    if step_index >= len(transaction_data["steps"]):
         return {
             "is_complete": True,
             "message": "Transaction processing complete"
         }
     
     # Get the current step
-    current_step = transaction_steps[step_index]
+    current_step = transaction_data["steps"][step_index]
     
     # Apply transformations for this step
     apply_transformations(transaction, step_index)
@@ -486,7 +480,7 @@ async def process_transaction_step(transaction_id: str, step_index: int = None):
     # Get transformation definitions for this step
     transformations = []
     if step_index > 0:  # No transformations for the first step
-        transformations = step_transformations.get(current_step["id"], [])
+        transformations = transaction_data["transformations"].get(current_step["id"], [])
     
     # Create the response
     response = {
@@ -497,16 +491,16 @@ async def process_transaction_step(transaction_id: str, step_index: int = None):
         "description": current_step["description"],
         "current_data": transaction["data"],
         "transformations": transformations,
-        "progress": (step_index + 1) / len(transaction_steps) * 100,
-        "is_complete": step_index == len(transaction_steps) - 1
+        "progress": (step_index + 1) / len(transaction_data["steps"]) * 100,
+        "is_complete": step_index == len(transaction_data["steps"]) - 1
     }
     
     # If there's a next step, include it
-    if step_index < len(transaction_steps) - 1:
-        response["next_step"] = transaction_steps[step_index + 1]["id"]
+    if step_index < len(transaction_data["steps"]) - 1:
+        response["next_step"] = transaction_data["steps"][step_index + 1]["id"]
         
     # If not the last step, increment the current step
-    if step_index < len(transaction_steps) - 1:
+    if step_index < len(transaction_data["steps"]) - 1:
         transaction["current_step"] = step_index + 1
     
     return response
@@ -545,87 +539,14 @@ async def reset_transaction(transaction_id: str):
 # In-memory storage for active transactions (would use DB in production)
 active_transactions = {}
 
-# Transaction step definitions
-transaction_steps = [
-    {
-        "id": "trade-capture",
-        "name": "Trade Capture",
-        "department": "Front Office",
-        "description": "Initial trade details captured from the trading desk"
-    },
-    {
-        "id": "trade-validation",
-        "name": "Trade Validation",
-        "department": "Middle Office",
-        "description": "Validating trade details against market data and rules"
-    },
-    {
-        "id": "trade-enrichment",
-        "name": "Trade Enrichment",
-        "department": "Middle Office",
-        "description": "Enriching trade with additional market and reference data"
-    },
-    {
-        "id": "risk-calculation",
-        "name": "Risk Calculation",
-        "department": "Risk Management",
-        "description": "Calculating risk metrics for the trade"
-    },
-    {
-        "id": "settlement-prep",
-        "name": "Settlement Preparation",
-        "department": "Back Office",
-        "description": "Preparing settlement instructions"
-    },
-    {
-        "id": "regulatory-reporting",
-        "name": "Regulatory Reporting",
-        "department": "Compliance",
-        "description": "Preparing data for regulatory reporting"
-    }
-]
-
-# Transformations for each step
-step_transformations = {
-    "trade-validation": [
-        {"field": "validationStatus", "action": "added", "description": "Validation result status"},
-        {"field": "validationTimestamp", "action": "added", "description": "Time of validation"}
-    ],
-    "trade-enrichment": [
-        {"field": "securityName", "action": "added", "description": "Security name from reference data"},
-        {"field": "marketValue", "action": "added", "description": "Calculated from price and quantity"},
-        {"field": "currency", "action": "added", "description": "Currency code from reference data"},
-        {"field": "exchangeRate", "action": "added", "description": "Current exchange rate"},
-        {"field": "settlementDate", "action": "added", "description": "Calculated settlement date"}
-    ],
-    "risk-calculation": [
-        {"field": "varValue", "action": "added", "description": "Value at Risk calculation"},
-        {"field": "deltaValue", "action": "added", "description": "Delta sensitivity"},
-        {"field": "gammaValue", "action": "added", "description": "Gamma sensitivity"}
-    ],
-    "settlement-prep": [
-        {"field": "valueCurrency", "action": "renamed", "description": "Renamed from currency for clarity"},
-        {"field": "settlementCurrency", "action": "added", "description": "Currency for settlement"},
-        {"field": "settlementInstructions", "action": "added", "description": "Instructions for settlement"},
-        {"field": "accountDetails", "action": "added", "description": "Account information for settlement"}
-    ],
-    "regulatory-reporting": [
-        {"field": "securityType", "action": "added", "description": "Type of security for reporting"},
-        {"field": "tradingDesk", "action": "added", "description": "Trading desk information"},
-        {"field": "reportingStatus", "action": "added", "description": "Status of regulatory reporting"},
-        {"field": "reportedTimestamp", "action": "added", "description": "Time of reporting"},
-        {"field": "regulatoryId", "action": "added", "description": "ID assigned by regulatory system"}
-    ]
-}
-
 def apply_transformations(transaction, step_index):
     """Apply transformations for the given step to the transaction data"""
     if step_index == 0:  # No transformations for the first step
         return
         
-    current_step = transaction_steps[step_index]
+    current_step = transaction_data["steps"][step_index]
     step_id = current_step["id"]
-    transformations = step_transformations.get(step_id, [])
+    transformations = transaction_data["transformations"].get(step_id, [])
     
     for transform in transformations:
         field = transform["field"]
@@ -679,6 +600,110 @@ def apply_transformations(transaction, step_index):
             if field == "valueCurrency" and "currency" in transaction["data"]:
                 transaction["data"][field] = transaction["data"]["currency"]
                 del transaction["data"]["currency"]
+
+# Load transaction data from JSON file
+TRANSACTION_FILE = os.path.join(os.path.dirname(__file__), "transactions.json")
+
+def load_transaction_data():
+    try:
+        with open(TRANSACTION_FILE, "r") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        raise RuntimeError(f"Transaction file not found: {TRANSACTION_FILE}")
+    except json.JSONDecodeError as e:
+        raise RuntimeError(f"Invalid JSON in transaction file: {e}")
+
+transaction_data = load_transaction_data()
+
+# API Endpoints
+@app.get("/transaction/steps")
+async def get_transaction_steps():
+    """Get all steps in the transaction process"""
+    return transaction_data["steps"]
+
+@app.get("/transaction/init")
+async def init_transaction():
+    """Initialize a new transaction with random data"""
+    transaction_id = f"T-{uuid.uuid4().hex[:8].upper()}"
+    
+    # Create sample initial transaction data
+    transaction = {
+        "tradeId": transaction_id,
+        "clientId": f"C-{100000 + int(random.random() * 900000)}",
+        "securityId": f"US-{10000 + int(random.random() * 90000)}",
+        "quantity": int(1000 + random.random() * 9000),
+        "price": round(50 + random.random() * 950, 2),
+        "tradeDate": (datetime.now()).strftime("%Y-%m-%d"),
+        "trader": "John Smith"
+    }
+    
+    # Store in memory (would be in database in production)
+    active_transactions[transaction_id] = {
+        "data": transaction,
+        "current_step": 0,
+        "created_at": datetime.now().isoformat()
+    }
+    
+    return {
+        "transaction_id": transaction_id,
+        "initial_data": transaction,
+        "step": 0,
+        "total_steps": len(transaction_data["steps"])  # Use transaction_data["steps"]
+    }
+
+@app.get("/transaction/{transaction_id}/process")
+async def process_transaction_step(transaction_id: str, step_index: int = None):
+    """Process a transaction step"""
+    # Check if transaction exists
+    if transaction_id not in active_transactions:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+    
+    transaction = active_transactions[transaction_id]
+    
+    # If step_index is provided, validate it
+    if step_index is not None:
+        if step_index < 0 or step_index >= len(transaction_data["steps"]):  # Use transaction_data["steps"]
+            raise HTTPException(status_code=400, detail="Invalid step index")
+    else:
+        step_index = transaction["current_step"]
+    
+    # Check if we've reached the end
+    if step_index >= len(transaction_data["steps"]):  # Use transaction_data["steps"]
+        raise HTTPException(status_code=400, detail="Transaction already completed")
+    
+    # Get the current step
+    current_step = transaction_data["steps"][step_index]  # Use transaction_data["steps"]
+    
+    # Apply transformations for this step
+    transformations = transaction_data["transformations"].get(current_step["id"], [])
+    for transform in transformations:
+        field = transform["field"]
+        action = transform["action"]
+        
+        if action == "added":
+            transaction["data"][field] = f"Sample value for {field}"
+        elif action == "renamed":
+            old_field = field.replace("value", "currency")  # Example renaming logic
+            transaction["data"][field] = transaction["data"].pop(old_field, None)
+    
+    # Create the response
+    response = {
+        "step_id": current_step["id"],
+        "step_name": current_step["name"],
+        "step_index": step_index,
+        "department": current_step["department"],
+        "description": current_step["description"],
+        "current_data": transaction["data"],
+        "transformations": transformations,
+        "progress": (step_index + 1) / len(transaction_data["steps"]) * 100,  # Use transaction_data["steps"]
+        "is_complete": step_index == len(transaction_data["steps"]) - 1  # Use transaction_data["steps"]
+    }
+    
+    # If not the last step, increment the current step
+    if step_index < len(transaction_data["steps"]) - 1:  # Use transaction_data["steps"]
+        transaction["current_step"] += 1
+    
+    return response
 
 if __name__ == '__main__':
     import uvicorn

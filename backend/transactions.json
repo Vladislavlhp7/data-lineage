@@ -1,0 +1,71 @@
+{
+  "steps": [
+    {
+      "id": "trade-capture",
+      "name": "Trade Capture",
+      "department": "Front Office",
+      "description": "Initial trade details captured from the trading desk"
+    },
+    {
+      "id": "trade-validation",
+      "name": "Trade Validation",
+      "department": "Middle Office",
+      "description": "Validating trade details against market data and rules"
+    },
+    {
+      "id": "trade-enrichment",
+      "name": "Trade Enrichment",
+      "department": "Middle Office",
+      "description": "Enriching trade with additional market and reference data"
+    },
+    {
+      "id": "risk-calculation",
+      "name": "Risk Calculation",
+      "department": "Risk Management",
+      "description": "Calculating risk metrics for the trade"
+    },
+    {
+      "id": "settlement-prep",
+      "name": "Settlement Preparation",
+      "department": "Back Office",
+      "description": "Preparing settlement instructions"
+    },
+    {
+      "id": "regulatory-reporting",
+      "name": "Regulatory Reporting",
+      "department": "Compliance",
+      "description": "Preparing data for regulatory reporting"
+    }
+  ],
+  "transformations": {
+    "trade-validation": [
+      { "field": "validationStatus", "action": "added", "description": "Validation result status" },
+      { "field": "validationTimestamp", "action": "added", "description": "Time of validation" }
+    ],
+    "trade-enrichment": [
+      { "field": "securityName", "action": "added", "description": "Security name from reference data" },
+      { "field": "marketValue", "action": "added", "description": "Calculated from price and quantity" },
+      { "field": "currency", "action": "added", "description": "Currency code from reference data" },
+      { "field": "exchangeRate", "action": "added", "description": "Current exchange rate" },
+      { "field": "settlementDate", "action": "added", "description": "Calculated settlement date" }
+    ],
+    "risk-calculation": [
+      { "field": "varValue", "action": "added", "description": "Value at Risk calculation" },
+      { "field": "deltaValue", "action": "added", "description": "Delta sensitivity" },
+      { "field": "gammaValue", "action": "added", "description": "Gamma sensitivity" }
+    ],
+    "settlement-prep": [
+      { "field": "valueCurrency", "action": "renamed", "description": "Renamed from currency for clarity" },
+      { "field": "settlementCurrency", "action": "added", "description": "Currency for settlement" },
+      { "field": "settlementInstructions", "action": "added", "description": "Instructions for settlement" },
+      { "field": "accountDetails", "action": "added", "description": "Account information for settlement" }
+    ],
+    "regulatory-reporting": [
+      { "field": "securityType", "action": "added", "description": "Type of security for reporting" },
+      { "field": "tradingDesk", "action": "added", "description": "Trading desk information" },
+      { "field": "reportingStatus", "action": "added", "description": "Status of regulatory reporting" },
+      { "field": "reportedTimestamp", "action": "added", "description": "Time of reporting" },
+      { "field": "regulatoryId", "action": "added", "description": "ID assigned by regulatory system" }
+    ]
+  }
+}
