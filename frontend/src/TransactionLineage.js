@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
 import './TransactionLineage.css';
@@ -12,7 +12,23 @@ function TransactionLineage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [processingAnimation, setProcessingAnimation] = useState(false);
-
+  
+  // State for draggable visualization
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragPosition, setDragPosition] = useState({ x: 0, y: 0 });
+  const [startPosition, setStartPosition] = useState({ x: 0, y: 0 });
+  const visualizationRef = useRef(null);
+  
+  // State for minimizable data panel
+  const [isDataPanelMinimized, setIsDataPanelMinimized] = useState(false);
+  const [dataPanelPosition, setDataPanelPosition] = useState({ x: 0, y: 0 });
+  const [isDraggingPanel, setIsDraggingPanel] = useState(false);
+  const [panelStartPosition, setPanelStartPosition] = useState({ x: 0, y: 0 });
+  const dataPanelRef = useRef(null);
+  
+  // Add state for visualization scale
+  const [scale, setScale] = useState(1);
+  
   // Fetch transaction steps and initialize a transaction
   useEffect(() => {
     const initializeTransaction = async () => {
@@ -73,11 +89,84 @@ function TransactionLineage() {
       setCurrentStep(0);
       setTransformations([]);
       setLoading(false);
+      // Reset drag position when resetting simulation
+      setDragPosition({ x: 0, y: 0 });
     } catch (error) {
       console.error('Error resetting transaction:', error);
       setError('Failed to reset transaction');
       setLoading(false);
     }
+  };
+  
+  // Mouse event handlers for dragging the background visualization
+  const handleMouseDown = (e) => {
+    // Check if we're clicking on the panel or a control element
+    if (e.target.closest('.floating-data-panel, .header-actions, .transaction-id') || 
+        e.target.tagName === 'BUTTON') {
+      return;
+    }
+    setIsDragging(true);
+    setStartPosition({
+      x: e.clientX - dragPosition.x,
+      y: e.clientY - dragPosition.y
+    });
+  };
+  
+  const handleMouseMove = (e) => {
+    if (isDragging) {
+      const newX = e.clientX - startPosition.x;
+      const newY = e.clientY - startPosition.y;
+      
+      setDragPosition({ x: newX, y: newY });
+    } else if (isDraggingPanel) {
+      const newX = e.clientX - panelStartPosition.x;
+      const newY = e.clientY - panelStartPosition.y;
+      
+      setDataPanelPosition({ x: newX, y: newY });
+    }
+  };
+  
+  const handleMouseUp = () => {
+    setIsDragging(false);
+    setIsDraggingPanel(false);
+  };
+  
+  const handleMouseLeave = () => {
+    setIsDragging(false);
+    setIsDraggingPanel(false);
+  };
+  
+  // Mouse event handlers for dragging the data panel
+  const handlePanelMouseDown = (e) => {
+    if (!e.target.closest('.panel-header')) return;
+    
+    e.stopPropagation();
+    setIsDraggingPanel(true);
+    setPanelStartPosition({
+      x: e.clientX - dataPanelPosition.x,
+      y: e.clientY - dataPanelPosition.y
+    });
+  };
+  
+  // Toggle data panel minimized state
+  const toggleDataPanel = () => {
+    setIsDataPanelMinimized(!isDataPanelMinimized);
+  };
+
+  // Function to handle zoom in/out
+  const handleZoom = (zoomIn) => {
+    if (zoomIn) {
+      // Zoom in - increase scale by 0.1, max 2.0
+      setScale(prevScale => Math.min(prevScale + 0.1, 2.0));
+    } else {
+      // Zoom out - decrease scale by 0.1, min 0.5
+      setScale(prevScale => Math.max(prevScale - 0.1, 0.5));
+    }
+  };
+  
+  // Reset zoom to default scale
+  const resetZoom = () => {
+    setScale(1);
   };
 
   if (loading) {
@@ -91,177 +180,65 @@ function TransactionLineage() {
   const currentStepData = steps[currentStep] || {};
 
   return (
-    <div className="transaction-lineage">
-      <div className="header-actions">
-        <Link to="/" className="back-link">
-          <i className="fas fa-arrow-left"></i> Back to Home
-        </Link>
-        <h1>Transaction Lineage Simulation</h1>
-        <button onClick={resetSimulation} className="reset-btn">
-          <i className="fas fa-redo"></i> Reset
-        </button>
-      </div>
-
-      {/* Transaction ID display */}
-      <div className="transaction-id">
-        <span className="label">Transaction ID:</span>
-        <span className="value">{transactionId}</span>
-      </div>
-
-      {/* Transaction flow visual representation */}
-      <div className="transaction-flow">
-        {steps.map((step, index) => (
-          <React.Fragment key={step.id}>
-            <div 
-              className={`flow-node ${index === currentStep ? 'active' : ''} ${index < currentStep ? 'completed' : ''}`}
-              title={step.description}
-            >
-              <div className="node-content">
-                <div className="node-icon">
-                  {index < currentStep ? (
-                    <i className="fas fa-check"></i>
-                  ) : (
-                    <span className="step-number">{index + 1}</span>
-                  )}
-                </div>
-                <div className="node-label">
-                  <div className="step-name">{step.name}</div>
-                  <div className="department">{step.department}</div>
-                </div>
-              </div>
-            </div>
-            {index < steps.length - 1 && (
-              <div className={`flow-connector ${index < currentStep ? 'completed' : ''} ${processingAnimation && index === currentStep ? 'processing' : ''}`}>
-                <div className="connector-line"></div>
-                {processingAnimation && index === currentStep && (
-                  <div className="processing-animation">
-                    <i className="fas fa-circle"></i>
-                  </div>
-                )}
-              </div>
-            )}
-          </React.Fragment>
-        ))}
-      </div>
-
-      {/* Current step information */}
-      <div className="current-step-info">
-        <h2>{currentStepData.name}</h2>
-        <div className="department-badge">{currentStepData.department}</div>
-        <p className="step-description">{currentStepData.description}</p>
-      </div>
-
-      {/* Data transformation visualization */}
-      <div className="data-transformation">
-        <div className="data-panel">
-          <h3>Transaction Data</h3>
-          <div className="data-table">
-            <table>
-              <thead>
-                <tr>
-                  <th>Field</th>
-                  <th>Value</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {transactionData && Object.entries(transactionData).map(([key, value]) => {
-                  // Determine if this field was transformed in the current step
-                  const isNewField = transformations && transformations.some(
-                    t => t.field === key && (t.action === 'added' || t.action === 'renamed')
-                  );
-                  
-                  return (
-                    <tr key={key} className={isNewField ? 'highlight-row' : ''}>
-                      <td>{key}</td>
-                      <td>
-                        {typeof value === 'object' ? JSON.stringify(value) : String(value)}
-                      </td>
-                      <td>
-                        {isNewField && (
-                          <span className="status-badge new">
-                            {transformations.find(t => t.field === key)?.action || 'New'}
-                          </span>
+    <div 
+      className="transaction-lineage full-width"
+      onMouseMove={handleMouseMove}
+      onMouseUp={handleMouseUp}
+      onMouseLeave={handleMouseLeave}
+    >
+      {/* Main playground background with visualization */}
+      <div className="lineage-playground" onMouseDown={handleMouseDown}>
+        <div 
+          className="visualization-content"
+          ref={visualizationRef}
+          style={{
+            transform: `translate(${dragPosition.x}px, ${dragPosition.y}px) scale(${scale})`,
+            transformOrigin: 'center center',
+            cursor: isDragging ? 'grabbing' : 'grab'
+          }}
+        >
+          {/* Upper Section - Process Flow */}
+          <div className="flow-section">
+            <div className="section-label">Transaction Process Flow</div>
+            <div className="transaction-flow">
+              {steps.map((step, index) => (
+                <React.Fragment key={step.id}>
+                  <div 
+                    className={`flow-node ${index === currentStep ? 'active' : ''} ${index < currentStep ? 'completed' : ''}`}
+                    title={step.description}
+                  >
+                    <div className="node-content">
+                      <div className="node-icon">
+                        {index < currentStep ? (
+                          <i className="fas fa-check"></i>
+                        ) : (
+                          <span className="step-number">{index + 1}</span>
                         )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* Transformations list for current step */}
-        {transformations && transformations.length > 0 && (
-          <div className="transformations">
-            <h3>Transformations in this Step</h3>
-            <ul className="transformation-list">
-              {transformations.map((transform, idx) => (
-                <li key={idx} className="transformation-item">
-                  <span className={`transform-type ${transform.action}`}>
-                    {transform.action === 'added' ? 'Add Field' : 
-                    transform.action === 'renamed' ? 'Rename Field' : 
-                    transform.action === 'modified' ? 'Modify Field' : 'Transform'}
-                  </span>
-                  <span className="transform-field">{transform.field}</span>
-                  <span className="transform-description">{transform.description}</span>
-                </li>
+                      </div>
+                      <div className="node-label">
+                        <div className="step-name">{step.name}</div>
+                        <div className="department">{step.department}</div>
+                      </div>
+                    </div>
+                  </div>
+                  {index < steps.length - 1 && (
+                    <div className={`flow-connector ${index < currentStep ? 'completed' : ''} ${processingAnimation && index === currentStep ? 'processing' : ''}`}>
+                      <div className="connector-line"></div>
+                      {processingAnimation && index === currentStep && (
+                        <div className="processing-animation">
+                          <i className="fas fa-circle"></i>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </React.Fragment>
               ))}
-            </ul>
+            </div>
           </div>
-        )}
-      </div>
 
-      {/* Bottom action area */}
-      <div className="action-area">
-        {currentStep < steps.length - 1 ? (
-          <button 
-            className="next-step-btn" 
-            onClick={processStep}
-            disabled={processingAnimation}
-          >
-            {processingAnimation ? (
-              <><i className="fas fa-spinner fa-spin"></i> Processing...</>
-            ) : (
-              <>Process to Next Step <i className="fas fa-arrow-right"></i></>
-            )}
-          </button>
-        ) : (
-          <div className="completion-message">
-            <i className="fas fa-check-circle"></i>
-            <span>Transaction processing complete!</span>
-            <button onClick={resetSimulation} className="restart-btn">
-              <i className="fas fa-redo"></i> Start New Transaction
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* Data lineage graph visualization */}
-      <div className="data-lineage-graph">
-        <h3>Data Lineage Graph</h3>
-        <div className="graph-container">
-          <div className="graph-legend">
-            <div className="legend-item">
-              <div className="legend-color data-source"></div>
-              <span>Data Source</span>
-            </div>
-            <div className="legend-item">
-              <div className="legend-color process"></div>
-              <span>Process</span>
-            </div>
-            <div className="legend-item">
-              <div className="legend-color data-field"></div>
-              <span>Data Field</span>
-            </div>
-            <div className="legend-item">
-              <div className="legend-color target"></div>
-              <span>Target System</span>
-            </div>
-          </div>
-          
-          <div className="graph-visualization">
+          {/* Lower Section - Data Lineage Graph */}
+          <div className="lineage-section">
+            <div className="section-label">Data Lineage Graph</div>
             <div className="lineage-graph">
               {/* Trading System Source */}
               <div className="lineage-node source">
@@ -397,14 +374,14 @@ function TransactionLineage() {
               <div className="lineage-connector"></div>
               
               {/* Regulatory Reporting */}
-              <div className={`lineage-node process ${currentStep >= 5 ? 'active' : ''}`}></div>
+              <div className={`lineage-node process ${currentStep >= 5 ? 'active' : ''}`}>
                 <div className="node-icon"><i className="fas fa-clipboard-list"></i></div>
                 <div className="node-text">Regulatory Reporting</div>
               </div>
               <div className="lineage-connector"></div>
               
               {/* Regulatory Report */}
-              <div className={`lineage-node target ${currentStep >= 5 ? 'active' : ''}`}></div>
+              <div className={`lineage-node target ${currentStep >= 5 ? 'active' : ''}`}>
                 <div className="node-icon"><i className="fas fa-file-contract"></i></div>
                 <div className="node-text">Regulatory Report</div>
                 <div className="node-details">
@@ -420,7 +397,174 @@ function TransactionLineage() {
               </div>
             </div>
           </div>
+          
+          {/* Visual connections between the two graphs */}
+          <div className="graph-connections">
+            {steps.map((step, index) => (
+              index < steps.length && (
+                <div 
+                  key={`connection-${index}`} 
+                  className={`vertical-connection ${currentStep >= index ? 'active' : ''}`}
+                  style={{ left: `${(100 / (steps.length - 1)) * index}%` }}
+                ></div>
+              )
+            ))}
+          </div>
         </div>
+        
+        {/* Add zoom controls */}
+        <div className="zoom-controls">
+          <button onClick={() => handleZoom(true)} className="zoom-btn" title="Zoom In">
+            <i className="fas fa-search-plus"></i>
+          </button>
+          <button onClick={resetZoom} className="zoom-btn" title="Reset Zoom">
+            <i className="fas fa-expand"></i> {Math.round(scale * 100)}%
+          </button>
+          <button onClick={() => handleZoom(false)} className="zoom-btn" title="Zoom Out">
+            <i className="fas fa-search-minus"></i>
+          </button>
+        </div>
+        
+        {/* Reset position button - shows when user has dragged */}
+        {(dragPosition.x !== 0 || dragPosition.y !== 0) && (
+          <button 
+            className="reset-position-btn"
+            onClick={() => setDragPosition({ x: 0, y: 0 })}
+          >
+            <i className="fas fa-crosshairs"></i> Reset Position
+          </button>
+        )}
+      </div>
+      
+      {/* Fixed Header Controls */}
+      <div className="fixed-header">
+        <div className="header-actions">
+          <Link to="/" className="back-link">
+            <i className="fas fa-arrow-left"></i> Back to Home
+          </Link>
+          <h1>Transaction Lineage Simulation</h1>
+          <div className="header-controls">
+            {currentStep < steps.length - 1 ? (
+              <button 
+                className="next-step-btn" 
+                onClick={processStep}
+                disabled={processingAnimation}
+              >
+                {processingAnimation ? (
+                  <><i className="fas fa-spinner fa-spin"></i> Processing...</>
+                ) : (
+                  <>Process to Next Step <i className="fas fa-arrow-right"></i></>
+                )}
+              </button>
+            ) : (
+              <div className="completion-badge">
+                <i className="fas fa-check-circle"></i>
+                <span>Completed</span>
+              </div>
+            )}
+            <button onClick={resetSimulation} className="reset-btn">
+              <i className="fas fa-redo"></i> Reset
+            </button>
+          </div>
+        </div>
+
+        {/* Transaction ID display */}
+        <div className="transaction-id">
+          <span className="label">Transaction ID:</span>
+          <span className="value">{transactionId}</span>
+          <div className="current-step-chip">
+            <span className="step-name">{currentStepData.name}</span>
+            <span className="step-department">{currentStepData.department}</span>
+          </div>
+        </div>
+      </div>
+      
+      {/* Floating Data Panel - movable and minimizable */}
+      <div 
+        className={`floating-data-panel vertical-panel ${isDataPanelMinimized ? 'minimized' : ''}`}
+        style={{
+          transform: `translateY(${dataPanelPosition.y}px)`
+        }}
+        ref={dataPanelRef}
+        onMouseDown={handlePanelMouseDown}
+      >
+        <div className="panel-header">
+          <h3>Transaction Data</h3>
+          <div className="panel-controls">
+            <button 
+              className="minimize-btn"
+              onClick={toggleDataPanel}
+              title={isDataPanelMinimized ? "Expand" : "Minimize"}
+            >
+              <i className={`fas fa-${isDataPanelMinimized ? 'chevron-left' : 'chevron-right'}`}></i>
+            </button>
+          </div>
+        </div>
+        
+        {!isDataPanelMinimized && (
+          <div className="panel-body">
+            <div className="data-table">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Field</th>
+                    <th>Value</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {transactionData && Object.entries(transactionData).map(([key, value]) => {
+                    // Determine if this field was transformed in the current step
+                    const isNewField = transformations && transformations.some(
+                      t => t.field === key && (t.action === 'added' || t.action === 'renamed')
+                    );
+                    
+                    return (
+                      <tr key={key} className={isNewField ? 'highlight-row' : ''}>
+                        <td>{key}</td>
+                        <td>
+                          {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                        </td>
+                        <td>
+                          {isNewField && (
+                            <span className="status-badge new">
+                              {transformations.find(t => t.field === key)?.action || 'New'}
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Help tips */}
+      <div className="help-tips">
+        <div className="tip">
+          <i className="fas fa-hand-pointer"></i> Click and drag to move around
+        </div>
+        <div className="tip">
+          <i className="fas fa-search-plus"></i> Use zoom controls to adjust view
+        </div>
+      </div>
+
+      {/* Completion status - shown at the end */}
+      {currentStep === steps.length - 1 && (
+        <div className="action-area">
+          <div className="completion-message">
+            <i className="fas fa-check-circle"></i>
+            <span>Transaction processing complete!</span>
+            <button onClick={resetSimulation} className="restart-btn">
+              <i className="fas fa-redo"></i> Start New Transaction
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
