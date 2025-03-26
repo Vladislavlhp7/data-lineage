@@ -3,11 +3,20 @@
   "version": "1.0.0",
   "private": true,
   "dependencies": {
+    "@tweenjs/tween.js": "^25.0.0",
+    "3d-force-graph": "^1.77.0",
     "axios": "^0.21.1",
+    "d3": "^7.9.0",
+    "force-graph": "^1.49.5",
     "react": "^17.0.2",
     "react-dom": "^17.0.2",
+    "react-force-graph": "^1.47.6",
+    "react-force-graph-2d": "^1.27.1",
+    "react-force-graph-3d": "^1.26.1",
     "react-router-dom": "^5.3.4",
-    "react-scripts": "4.0.3"
+    "react-scripts": "4.0.3",
+    "three": "^0.174.0",
+    "three-stdlib": "^2.35.14"
   },
   "scripts": {
     "start": "export NODE_OPTIONS=--openssl-legacy-provider && react-scripts start",
