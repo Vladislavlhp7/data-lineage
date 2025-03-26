@@ -227,10 +227,10 @@ def generate_sample_trade(db_session, trade_id=None):
     return trade
 
 
-def promote_trade(db_session, trade_id, target_stage="regulatory_reporting"):
+def promote_trade(db_session, trade_id, target_stage=None):
     """
-    Promote a trade through the lineage stages up to the specified target stage.
-    Each stage must be completed sequentially.
+    Promote a trade through the lineage stages. If `target_stage` is not provided,
+    promote the trade to the next stage from its current state.
     
     Args:
         db_session: SQLAlchemy session
@@ -243,88 +243,102 @@ def promote_trade(db_session, trade_id, target_stage="regulatory_reporting"):
     """
     import random
     from datetime import datetime, timedelta
-    
+
     # Find the trade
     trade = db_session.query(TradeExecution).filter_by(trade_id=trade_id).first()
     if not trade:
         return {"error": "Trade not found"}
-    
+
+    # Define the stages and determine the current stage
     stages = ["validation", "enrichment", "risk_calculation", "settlement", "regulatory_reporting"]
-    target_index = stages.index(target_stage) if target_stage in stages else len(stages) - 1
-    
+    current_stage_index = 0
+
+    if trade.validation:
+        current_stage_index = 1
+    if trade.validation and trade.validation.enrichment:
+        current_stage_index = 2
+    if trade.validation and trade.validation.enrichment and trade.validation.enrichment.risk_calculation:
+        current_stage_index = 3
+    if trade.validation and trade.validation.enrichment and trade.validation.enrichment.risk_calculation and trade.validation.enrichment.risk_calculation.settlement:
+        current_stage_index = 4
+
+    # Determine the target stage index
+    if target_stage:
+        if target_stage not in stages:
+            return {"error": f"Invalid target stage: {target_stage}"}
+        target_index = stages.index(target_stage)
+    else:
+        # Promote to the next stage if no target_stage is provided
+        target_index = current_stage_index + 1
+
+    if target_index <= current_stage_index:
+        return {"error": "Cannot promote to a previous or the same stage"}
+
     # Stage 1: Validation
-    if target_index >= 0:
-        if not trade.validation:
-            validation = TradeValidation(
-                execution_id=trade.id,
-                validation_status="Confirmed",
-                trade_ref_number=f"{trade.counterparty[:2].upper()}-{datetime.now().strftime('%Y%m%d')}-{random.randint(1000, 9999)}",
-                settlement_date=datetime.now() + timedelta(days=3),
-                validated_at=datetime.now()
-            )
-            db_session.add(validation)
-            db_session.commit()
-        else:
-            validation = trade.validation
-    
+    if target_index >= 1 and not trade.validation:
+        validation = TradeValidation(
+            execution_id=trade.id,
+            validation_status="Confirmed",
+            trade_ref_number=f"{trade.counterparty[:2].upper()}-{datetime.now().strftime('%Y%m%d')}-{random.randint(1000, 9999)}",
+            settlement_date=datetime.now() + timedelta(days=3),
+            validated_at=datetime.now()
+        )
+        db_session.add(validation)
+        db_session.commit()
+        trade.validation = validation
+
     # Stage 2: Enrichment
-    if target_index >= 1:
-        if not validation.enrichment:
-            enrichment = TradeEnrichment(
-                validation_id=validation.id,
-                market_data_source=random.choice(["Bloomberg", "Refinitiv", "S&P Capital IQ"]),
-                bond_yield=round(random.uniform(2.0, 5.0), 2) if trade.asset_class == "Bond" else None,
-                sector=random.choice(["Corporate Debt", "Government", "Financial", "Technology", "Healthcare"]),
-                enriched_at=datetime.now()
-            )
-            db_session.add(enrichment)
-            db_session.commit()
-        else:
-            enrichment = validation.enrichment
-    
+    if target_index >= 2 and trade.validation and not trade.validation.enrichment:
+        enrichment = TradeEnrichment(
+            validation_id=trade.validation.id,
+            market_data_source=random.choice(["Bloomberg", "Refinitiv", "S&P Capital IQ"]),
+            bond_yield=round(random.uniform(2.0, 5.0), 2) if trade.asset_class == "Bond" else None,
+            sector=random.choice(["Corporate Debt", "Government", "Financial", "Technology", "Healthcare"]),
+            enriched_at=datetime.now()
+        )
+        db_session.add(enrichment)
+        db_session.commit()
+        trade.validation.enrichment = enrichment
+
     # Stage 3: Risk Calculation
-    if target_index >= 2:
-        if not enrichment.risk_calculation:
-            notional = trade.notional_amount
-            risk_calc = RiskCalculation(
-                enrichment_id=enrichment.id,
-                market_risk_exposure=round(notional * random.uniform(0.03, 0.08)),  # 3-8% of notional
-                credit_risk_exposure=round(notional * random.uniform(0.15, 0.30)),  # 15-30% of notional
-                calculation_timestamp=datetime.now()
-            )
-            db_session.add(risk_calc)
-            db_session.commit()
-        else:
-            risk_calc = enrichment.risk_calculation
-    
+    if target_index >= 3 and trade.validation.enrichment and not trade.validation.enrichment.risk_calculation:
+        notional = trade.notional_amount
+        risk_calc = RiskCalculation(
+            enrichment_id=trade.validation.enrichment.id,
+            market_risk_exposure=round(notional * random.uniform(0.03, 0.08)),  # 3-8% of notional
+            credit_risk_exposure=round(notional * random.uniform(0.15, 0.30)),  # 15-30% of notional
+            calculation_timestamp=datetime.now()
+        )
+        db_session.add(risk_calc)
+        db_session.commit()
+        trade.validation.enrichment.risk_calculation = risk_calc
+
     # Stage 4: Settlement Preparation
-    if target_index >= 3:
-        if not risk_calc.settlement:
-            settlement = SettlementPreparation(
-                risk_calculation_id=risk_calc.id,
-                settlement_status="Pending",
-                payment_confirmation="Awaiting",
-                settlement_timestamp=datetime.now()
-            )
-            db_session.add(settlement)
-            db_session.commit()
-        else:
-            settlement = risk_calc.settlement
-    
+    if target_index >= 4 and trade.validation.enrichment.risk_calculation and not trade.validation.enrichment.risk_calculation.settlement:
+        settlement = SettlementPreparation(
+            risk_calculation_id=trade.validation.enrichment.risk_calculation.id,
+            settlement_status="Pending",
+            payment_confirmation="Awaiting",
+            settlement_timestamp=datetime.now()
+        )
+        db_session.add(settlement)
+        db_session.commit()
+        trade.validation.enrichment.risk_calculation.settlement = settlement
+
     # Stage 5: Regulatory Reporting
-    if target_index >= 4:
-        if not settlement.regulatory_reporting:
-            reporting = RegulatoryReporting(
-                settlement_id=settlement.id,
-                regulation="BCBS 239",
-                reported_to="European Banking Authority (EBA)",
-                report_submission_date=datetime.now() + timedelta(days=1),
-                is_submitted=False,
-                reporting_timestamp=datetime.now()
-            )
-            db_session.add(reporting)
-            db_session.commit()
-    
+    if target_index >= 5 and trade.validation.enrichment.risk_calculation.settlement and not trade.validation.enrichment.risk_calculation.settlement.regulatory_reporting:
+        reporting = RegulatoryReporting(
+            settlement_id=trade.validation.enrichment.risk_calculation.settlement.id,
+            regulation="BCBS 239",
+            reported_to="European Banking Authority (EBA)",
+            report_submission_date=datetime.now() + timedelta(days=1),
+            is_submitted=False,
+            reporting_timestamp=datetime.now()
+        )
+        db_session.add(reporting)
+        db_session.commit()
+        trade.validation.enrichment.risk_calculation.settlement.regulatory_reporting = reporting
+
     # Return the updated lineage
     return get_trade_lineage(db_session, trade_id)
 

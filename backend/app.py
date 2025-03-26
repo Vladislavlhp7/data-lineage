@@ -540,61 +540,52 @@ async def reset_transaction(transaction_id: str):
 active_transactions = {}
 
 def apply_transformations(transaction, step_index):
-    """Apply transformations for the given step to the transaction data"""
+    """
+    Apply transformations for the given step to the transaction data.
+    """
     if step_index == 0:  # No transformations for the first step
         return
-        
+
     current_step = transaction_data["steps"][step_index]
     step_id = current_step["id"]
     transformations = transaction_data["transformations"].get(step_id, [])
-    
+
     for transform in transformations:
         field = transform["field"]
         action = transform["action"]
-        
+
         if action == "added":
             # Add new fields based on field name
-            if field == "validationStatus":
-                transaction["data"][field] = "VALID"
-            elif field == "validationTimestamp":
-                transaction["data"][field] = datetime.now().isoformat()
-            elif field == "securityName":
-                transaction["data"][field] = "Sample Corp Common Stock"
-            elif field == "marketValue":
-                price = transaction["data"]["price"]
-                quantity = transaction["data"]["quantity"]
-                transaction["data"][field] = round(price * quantity, 2)
-            elif field == "currency":
-                transaction["data"][field] = "USD"
-            elif field == "exchangeRate":
-                transaction["data"][field] = 1.0
-            elif field == "settlementDate":
+            if field == "validation_status":
+                transaction["data"][field] = "Confirmed"
+            elif field == "trade_ref_number":
+                transaction["data"][field] = f"TR-{random.randint(1000, 9999)}"
+            elif field == "settlement_date":
                 trade_date = datetime.strptime(transaction["data"]["tradeDate"], "%Y-%m-%d")
-                settlement_date = trade_date + timedelta(days=2)  # T+2 settlement
+                settlement_date = trade_date + timedelta(days=3)
                 transaction["data"][field] = settlement_date.strftime("%Y-%m-%d")
-            elif field == "varValue":
-                market_value = transaction["data"].get("marketValue", 0)
-                transaction["data"][field] = round(market_value * 0.05, 2)
-            elif field == "deltaValue":
-                transaction["data"][field] = 0.65
-            elif field == "gammaValue":
-                transaction["data"][field] = 0.12
-            elif field == "settlementCurrency":
-                transaction["data"][field] = "USD"
-            elif field == "settlementInstructions":
-                transaction["data"][field] = "SWIFT: BKCHGB2L"
-            elif field == "accountDetails":
-                transaction["data"][field] = f"ACCT: {74000000 + int(random.random() * 999999)}"
-            elif field == "securityType":
-                transaction["data"][field] = "STOCK"
-            elif field == "tradingDesk":
-                transaction["data"][field] = "EQUITY-TRADING-1"
-            elif field == "reportingStatus":
-                transaction["data"][field] = "REPORTED"
-            elif field == "reportedTimestamp":
-                transaction["data"][field] = datetime.now().isoformat()
-            elif field == "regulatoryId":
-                transaction["data"][field] = f"REG-{10000 + int(random.random() * 90000)}"
+            elif field == "market_data_source":
+                transaction["data"][field] = "S&P Capital IQ"
+            elif field == "bond_yield":
+                transaction["data"][field] = None
+            elif field == "sector":
+                transaction["data"][field] = "Government"
+            elif field == "market_risk_exposure":
+                transaction["data"][field] = round(transaction["data"]["quantity"] * 0.05, 2)
+            elif field == "credit_risk_exposure":
+                transaction["data"][field] = round(transaction["data"]["quantity"] * 0.1, 2)
+            elif field == "settlement_status":
+                transaction["data"][field] = "Pending"
+            elif field == "payment_confirmation":
+                transaction["data"][field] = "Awaiting"
+            elif field == "regulation":
+                transaction["data"][field] = "BCBS 239"
+            elif field == "reported_to":
+                transaction["data"][field] = "European Banking Authority (EBA)"
+            elif field == "report_submission_date":
+                transaction["data"][field] = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
+            elif field == "is_submitted":
+                transaction["data"][field] = False
         elif action == "renamed":
             # Handle renamed fields
             if field == "valueCurrency" and "currency" in transaction["data"]:

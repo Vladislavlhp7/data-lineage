@@ -54,47 +54,24 @@ function TransactionLineage() {
     initializeTransaction();
   }, []);
 
-  // Process the transaction to the next step
-  const processStep = async () => {
-    if (currentStep >= steps.length - 1) return; // Prevent processing beyond the last step
-
-    setProcessingAnimation(true);
-
-    try {
-      const response = await axios.get(
-        `http://localhost:8000/transaction/${transactionId}/process?step_index=${currentStep}`
-      );
-
-      // Update transaction data and transformations
-      setTransactionData(response.data.current_data);
-      setTransformations(response.data.transformations);
-
-      // Increment step after animation
-      setTimeout(() => {
-        setCurrentStep((prevStep) => prevStep + 1);
-        setProcessingAnimation(false);
-      }, 1000);
-    } catch (error) {
-      console.error("Error processing transaction step:", error);
-      setError("Failed to process transaction step");
-      setProcessingAnimation(false);
-    }
-  };
-
   // Reset the simulation
   const resetSimulation = async () => {
+    if (!transactionId) {
+      alert('No transaction found to reset.');
+      return;
+    }
+    setLoading(true);
     try {
-      setLoading(true);
       const response = await axios.get(`http://localhost:8000/transaction/${transactionId}/reset`);
-      setTransactionData(response.data.data);
-      setCurrentStep(0);
-      setTransformations([]);
-      setLoading(false);
-      // Reset drag position to center the entire lineage
-      setDragPosition({ x: 0, y: 0 });
+      setTransactionData(response.data.data); // Reset transaction data
+      setCurrentStep(0); // Reset to the first step
+      setTransformations([]); // Clear transformations
+      setProcessingAnimation(false); // Stop any ongoing animations
+      setDragPosition({ x: 0, y: 0 }); // Reset drag position
     } catch (error) {
       console.error('Error resetting transaction:', error);
-      setError('Failed to reset transaction');
+      alert('Failed to reset transaction. Please try again.');
+    } finally {
       setLoading(false);
     }
   };
@@ -194,6 +171,69 @@ function TransactionLineage() {
     centerVisualization();
   }, [visualizationRef]);
 
+  // Function to create a new transaction
+  const createTransaction = async () => {
+    setLoading(true);
+    try {
+      const response = await axios.post('http://localhost:8000/api/transaction/create');
+      const tradeExecutionData = response.data.initial_data.trade_execution; // Extract nested data
+      setTransactionId(response.data.trade_id);
+      setTransactionData(response.data.initial_data); // Populate the entire transaction data
+      setCurrentStep(0); // Reset currentStep to 0 for the new transaction
+      setTransformations([]); // Clear transformations
+      localStorage.setItem('transactionId', response.data.trade_id); // Store in browser
+      localStorage.setItem('transactionData', JSON.stringify(response.data.initial_data));
+    } catch (error) {
+      console.error('Error creating transaction:', error);
+      alert('Failed to create transaction. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Function to promote the transaction to the next stage
+  const promoteTransaction = async () => {
+    if (!transactionId) {
+      alert('No transaction found. Please start a transaction first.');
+      return;
+    }
+    setProcessingAnimation(true); // Start the animation
+    try {
+      const response = await axios.post(`http://localhost:8000/api/transaction/promote/${transactionId}`);
+      const updatedData = response.data.updated_data;
+
+      // Update transaction data with the latest data for all stages
+      setTransactionData({
+        tradeExecution: updatedData.trade_execution,
+        tradeValidation: updatedData.trade_validation,
+        tradeEnrichment: updatedData.trade_enrichment,
+        riskCalculation: updatedData.risk_calculation,
+        settlementPreparation: updatedData.settlement_preparation,
+        regulatoryReporting: updatedData.regulatory_reporting,
+      });
+
+      // Mark the current step as completed and move to the next step
+      setTimeout(() => {
+        setCurrentStep((prevStep) => prevStep + 1);
+        setProcessingAnimation(false); // Stop the animation
+      }, 1000); // Match the animation duration
+    } catch (error) {
+      console.error('Error promoting transaction:', error);
+      alert('Failed to promote transaction. Please try again.');
+      setProcessingAnimation(false); // Stop the animation on error
+    }
+  };
+
+  // Load transaction from browser storage on component mount
+  useEffect(() => {
+    const storedTransactionId = localStorage.getItem('transactionId');
+    const storedTransactionData = localStorage.getItem('transactionData');
+    if (storedTransactionId && storedTransactionData) {
+      setTransactionId(storedTransactionId);
+      setTransactionData(JSON.parse(storedTransactionData));
+    }
+  }, []);
+
   if (loading) {
     return <div className="loading"><i className="fas fa-spinner fa-spin"></i> Loading transaction data...</div>;
   }
@@ -227,12 +267,10 @@ function TransactionLineage() {
           </div>
         </div>
         {index < steps.length - 1 && (
-          <div className={`flow-connector ${index < currentStep ? 'completed' : ''} ${processingAnimation && index === currentStep ? 'processing' : ''}`}>
+          <div className={`flow-connector ${index < currentStep ? 'completed' : ''}`}>
             <div className="connector-line"></div>
             {processingAnimation && index === currentStep && (
-              <div className="processing-animation">
-                <i className="fas fa-circle"></i>
-              </div>
+              <div className="moving-point"></div> // Add the moving point
             )}
           </div>
         )}
@@ -240,6 +278,52 @@ function TransactionLineage() {
     ));
   };
 
+  // Render transformations in the data panel
+  const renderTransformations = () => {
+    return transformations.map((transformation, index) => (
+      <div key={index} className="transformation-item">
+        <div className={`transform-type ${transformation.action}`}>
+          {transformation.action}
+        </div>
+        <div className="transform-field">{transformation.field}</div>
+        <div className="transform-description">{transformation.description}</div>
+      </div>
+    ));
+  };
+
+  // Render the transaction data in the data panel
+  const renderTransactionData = () => {
+    if (!transactionData) return null;
+
+    const sections = [
+      { title: "Trade Execution", data: transactionData.tradeExecution },
+      { title: "Trade Validation", data: transactionData.tradeValidation },
+      { title: "Trade Enrichment", data: transactionData.tradeEnrichment },
+      { title: "Risk Calculation", data: transactionData.riskCalculation },
+      { title: "Settlement Preparation", data: transactionData.settlementPreparation },
+      { title: "Regulatory Reporting", data: transactionData.regulatoryReporting },
+    ];
+
+    return sections.map((section, index) => (
+      section.data && (
+        <div key={index} className="transaction-section">
+          <h4>{section.title}</h4>
+          <table>
+            <tbody>
+              {Object.entries(section.data).map(([key, value]) => (
+                <tr key={key}>
+                  <td>{key}</td>
+                  <td>{value !== null ? value.toString() : "N/A"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )
+    ));
+  };
+
+  // Replace the "Transaction Data" panel with the transaction table
   return (
     <div 
       className="transaction-lineage full-width"
@@ -423,11 +507,14 @@ function TransactionLineage() {
         <div className="header-content">
           <h1>Transaction Lineage Simulation</h1>
           <div className="header-controls">
+            <button onClick={createTransaction} disabled={loading} className="start-btn">
+              {loading ? 'Starting...' : 'Start Transaction'}
+            </button>
             {currentStep < steps.length - 1 ? (
               <button 
                 className="next-step-btn" 
-                onClick={processStep}
-                disabled={processingAnimation}
+                onClick={promoteTransaction}
+                disabled={processingAnimation || !transactionId}
               >
                 {processingAnimation ? (
                   <><i className="fas fa-spinner fa-spin"></i> Processing...</>
@@ -448,7 +535,7 @@ function TransactionLineage() {
         </div>
       </div>
       
-      {/* Floating Data Panel */}
+      {/* Replace "Transaction Data" panel with the transaction table */}
       <div 
         className={`floating-data-panel vertical-panel ${isDataPanelMinimized ? 'minimized' : ''}`}
         style={{
@@ -472,66 +559,22 @@ function TransactionLineage() {
         
         {!isDataPanelMinimized && (
           <div className="panel-body">
-            <div className="data-table">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Field</th>
-                    <th>Value</th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {transactionData && Object.entries(transactionData).map(([key, value]) => {
-                    const isNewField = transformations && transformations.some(
-                      t => t.field === key && (t.action === 'added' || t.action === 'renamed')
-                    );
-                    
-                    return (
-                      <tr key={key} className={isNewField ? 'highlight-row' : ''}>
-                        <td>{key}</td>
-                        <td>
-                          {typeof value === 'object' ? JSON.stringify(value) : String(value)}
-                        </td>
-                        <td>
-                          {isNewField && (
-                            <span className="status-badge new">
-                              {transformations.find(t => t.field === key)?.action || 'New'}
-                            </span>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+            <div className="transaction-table">
+              {renderTransactionData()}
             </div>
+
+            {/* Render transformations */}
+            {transformations.length > 0 && (
+              <div className="transformations">
+                <h4>Transformations</h4>
+                <div className="transformation-list">
+                  {renderTransformations()}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
-
-      {/* Help tips */}
-      <div className="help-tips">
-        <div className="tip">
-          <i className="fas fa-hand-pointer"></i> Click and drag to move around
-        </div>
-        <div className="tip">
-          <i className="fas fa-search-plus"></i> Use zoom controls to adjust view
-        </div>
-      </div>
-
-      {/* Completion status - shown at the end */}
-      {currentStep === steps.length - 1 && (
-        <div className="action-area">
-          <div className="completion-message">
-            <i className="fas fa-check-circle"></i>
-            <span>Transaction processing complete!</span>
-            <button onClick={resetSimulation} className="restart-btn">
-              <i className="fas fa-redo"></i> Start New Transaction
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

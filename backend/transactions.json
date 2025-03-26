@@ -25,7 +25,7 @@
       "description": "Calculating risk metrics for the trade"
     },
     {
-      "id": "settlement-prep",
+      "id": "settlement-preparation",
       "name": "Settlement Preparation",
       "department": "Back Office",
       "description": "Preparing settlement instructions"
@@ -39,33 +39,28 @@
   ],
   "transformations": {
     "trade-validation": [
-      { "field": "validationStatus", "action": "added", "description": "Validation result status" },
-      { "field": "validationTimestamp", "action": "added", "description": "Time of validation" }
+      { "field": "validation_status", "action": "added", "description": "Validation result status" },
+      { "field": "trade_ref_number", "action": "added", "description": "Reference number for the trade" },
+      { "field": "settlement_date", "action": "added", "description": "Planned settlement date" }
     ],
     "trade-enrichment": [
-      { "field": "securityName", "action": "added", "description": "Security name from reference data" },
-      { "field": "marketValue", "action": "added", "description": "Calculated from price and quantity" },
-      { "field": "currency", "action": "added", "description": "Currency code from reference data" },
-      { "field": "exchangeRate", "action": "added", "description": "Current exchange rate" },
-      { "field": "settlementDate", "action": "added", "description": "Calculated settlement date" }
+      { "field": "market_data_source", "action": "added", "description": "Source of market data" },
+      { "field": "bond_yield", "action": "added", "description": "Yield of the bond (if applicable)" },
+      { "field": "sector", "action": "added", "description": "Sector classification of the trade" }
     ],
     "risk-calculation": [
-      { "field": "varValue", "action": "added", "description": "Value at Risk calculation" },
-      { "field": "deltaValue", "action": "added", "description": "Delta sensitivity" },
-      { "field": "gammaValue", "action": "added", "description": "Gamma sensitivity" }
+      { "field": "market_risk_exposure", "action": "added", "description": "Exposure to market risk" },
+      { "field": "credit_risk_exposure", "action": "added", "description": "Exposure to credit risk" }
     ],
-    "settlement-prep": [
-      { "field": "valueCurrency", "action": "renamed", "description": "Renamed from currency for clarity" },
-      { "field": "settlementCurrency", "action": "added", "description": "Currency for settlement" },
-      { "field": "settlementInstructions", "action": "added", "description": "Instructions for settlement" },
-      { "field": "accountDetails", "action": "added", "description": "Account information for settlement" }
+    "settlement-preparation": [
+      { "field": "settlement_status", "action": "added", "description": "Status of settlement preparation" },
+      { "field": "payment_confirmation", "action": "added", "description": "Confirmation of payment readiness" }
     ],
     "regulatory-reporting": [
-      { "field": "securityType", "action": "added", "description": "Type of security for reporting" },
-      { "field": "tradingDesk", "action": "added", "description": "Trading desk information" },
-      { "field": "reportingStatus", "action": "added", "description": "Status of regulatory reporting" },
-      { "field": "reportedTimestamp", "action": "added", "description": "Time of reporting" },
-      { "field": "regulatoryId", "action": "added", "description": "ID assigned by regulatory system" }
+      { "field": "regulation", "action": "added", "description": "Applicable regulation for reporting" },
+      { "field": "reported_to", "action": "added", "description": "Entity to which the report is submitted" },
+      { "field": "report_submission_date", "action": "added", "description": "Date of report submission" },
+      { "field": "is_submitted", "action": "added", "description": "Whether the report has been submitted" }
     ]
   }
 }
