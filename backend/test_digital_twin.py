@@ -10,62 +10,47 @@ from datetime import datetime
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from tabulate import tabulate
+import requests
 
 # Import our models
 from bank_digital_twin import Base, TradeExecution, TradeValidation, TradeEnrichment, \
     RiskCalculation, SettlementPreparation, RegulatoryReporting, \
     generate_sample_trade, promote_trade, get_trade_lineage
 
-def setup_database():
-    """Create an in-memory SQLite database for testing"""
-    engine = create_engine('sqlite:///:memory:', echo=False)
-    Base.metadata.create_all(engine)
-    Session = sessionmaker(bind=engine)
-    return Session()
+BASE_URL = "http://127.0.0.1:8000/api/transaction"
 
-def generate_bcbs_report(db_session):
-    """Generate a BCBS 239 compliance report from all regulatory reporting entries"""
-    # Query all trades with regulatory reporting
-    query = db_session.query(
-        TradeExecution.trade_id,
-        TradeExecution.counterparty,
-        TradeExecution.notional_amount,
-        RiskCalculation.market_risk_exposure,
-        RiskCalculation.credit_risk_exposure,
-        SettlementPreparation.settlement_status,
-        RegulatoryReporting.regulation,
-        RegulatoryReporting.reported_to,
-        RegulatoryReporting.is_submitted
-    ).join(
-        TradeValidation, TradeExecution.id == TradeValidation.execution_id
-    ).join(
-        TradeEnrichment, TradeValidation.id == TradeEnrichment.validation_id
-    ).join(
-        RiskCalculation, TradeEnrichment.id == RiskCalculation.enrichment_id
-    ).join(
-        SettlementPreparation, RiskCalculation.id == SettlementPreparation.risk_calculation_id
-    ).join(
-        RegulatoryReporting, SettlementPreparation.id == RegulatoryReporting.settlement_id
-    ).all()
-    
-    # Format the report data
-    report_data = []
-    for row in query:
-        trade_id, counterparty, notional, market_risk, credit_risk, settlement, regulation, reported_to, is_submitted = row
-        
-        report_data.append([
-            trade_id,
-            counterparty,
-            f"${notional:,.0f}",
-            f"${market_risk:,.0f}",
-            f"${credit_risk:,.0f}",
-            settlement,
-            regulation,
-            reported_to,
-            "✅ Submitted" if is_submitted else "⏳ Pending"
-        ])
-    
-    return report_data
+# def setup_database():
+#     """Create an in-memory SQLite database for testing"""
+#     DATABASE_URL = "sqlite:///./test.db"
+#     engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+#     SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+#     return SessionLocal()
+
+def create_trade():
+    """Create a trade via the FastAPI endpoint"""
+    response = requests.post(f"{BASE_URL}/create")
+    if response.status_code != 200:
+        raise Exception(f"Failed to create trade: {response.json()}")
+    return response.json()
+
+def promote_trade(trade_id, target_stage):
+    """Promote a trade via the FastAPI endpoint"""
+    response = requests.post(f"{BASE_URL}/promote/{trade_id}", json={"target_stage": target_stage})
+    if response.status_code != 200:
+        raise Exception(f"Failed to promote trade: {response.json()}")
+    return response.json()
+
+def generate_bcbs_report():
+    """Generate a BCBS 239 compliance report"""
+    # This function assumes a separate endpoint for fetching reports, which is not implemented yet.
+    print("\n[INFO] BCBS report generation via API is not implemented. Use database queries directly.")
+
+def print_bcbs_report_placeholder():
+    """Placeholder for BCBS report printing"""
+    print("\n" + "="*100)
+    print(f"📊 BCBS 239 COMPLIANCE REPORT - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print("="*100)
+    print("\n[INFO] BCBS report generation via API is not implemented in this demo.")
 
 def print_lineage_summary(lineage):
     """Print a summary of the trade lineage"""
@@ -192,42 +177,33 @@ def finalize_regulatory_reporting(db_session):
     db_session.commit()
 
 def main():
-    """Main function to test the bank digital twin with multiple transactions"""
-    print("\n🏦 BANK DIGITAL TWIN - MULTI-TRANSACTION LINEAGE DEMO")
+    """Main function to test the FastAPI server with multiple transactions"""
+    print("\n🏦 BANK DIGITAL TWIN - FASTAPI TEST DEMO")
     print("="*60)
     
     # Number of trades to generate
     num_trades = 10
     
-    # Setup the database
-    print("\n[1/4] Setting up in-memory database...")
-    db_session = setup_database()
-    
     # Generate multiple sample trades
-    print("\n[2/4] Generating sample trades...")
-    trades = generate_multiple_trades(db_session, num_trades)
+    print("\n[1/3] Generating sample trades...")
+    trades = []
+    for i in range(1, num_trades + 1):
+        trade_id = f"T{10000 + i}"
+        trade = create_trade()
+        trades.append(trade)
+        print(f"  ✓ Created trade {trade['trade_id']} with {trade['initial_data']['trade_execution']['counterparty']}")
     
-    # Process all trades through the lineage
-    print("\n[3/4] Processing trades through all stages...")
-    lineages = process_trades_batch(db_session, trades)
+    # Promote all trades through the lineage
+    print("\n[2/3] Promoting trades through all stages...")
+    for i, trade in enumerate(trades, 1):
+        promote_trade(trade['trade_id'], "regulatory_reporting")
+        print(f"  ✓ [{i}/{num_trades}] Promoted trade {trade['initial_data']['trade_execution']}")
     
-    # Finalize all regulatory reports
-    print("\n[4/4] Finalizing regulatory reporting...")
-    finalize_regulatory_reporting(db_session)
-    
-    # Generate reports
-    print("\n[5/4] Generating reports...")
-    
-    # Print a detailed lineage for the first trade as an example
-    print("\n📋 EXAMPLE TRADE LINEAGE (First Trade)")
-    print_lineage_summary(lineages[0])
-    
-    # Generate and print the BCBS report for all trades
-    report_data = generate_bcbs_report(db_session)
-    print_bcbs_report(report_data)
+    # Generate and print the BCBS report
+    print("\n[3/3] Generating BCBS report...")
+    print_bcbs_report_placeholder()
     
     print(f"\n✅ Demo completed successfully! Processed {num_trades} trades.\n")
-
 
 if __name__ == "__main__":
     main()

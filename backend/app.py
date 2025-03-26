@@ -705,6 +705,55 @@ async def process_transaction_step(transaction_id: str, step_index: int = None):
     
     return response
 
-if __name__ == '__main__':
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000, reload=True)
+from bank_digital_twin import promote_trade, generate_sample_trade, get_trade_lineage
+from fastapi import FastAPI, Depends, HTTPException
+from sqlalchemy.orm import Session
+from bank_digital_twin import promote_trade, generate_sample_trade, get_trade_lineage, get_db
+from bank_digital_twin import Base as DigitalTwinBase
+from sqlalchemy import create_engine
+
+# Database configuration
+DATABASE_URL = "sqlite:///./bank_digital_twin.db"
+engine = create_engine(DATABASE_URL)
+DigitalTwinBase.metadata.create_all(bind=engine)
+SessionLocalTwin = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+# Dependency
+def get_trade_db():
+    db = SessionLocalTwin()
+    try:
+        yield db
+    finally:
+        db.close()
+
+@app.post("/api/transaction/create")
+async def create_transaction(db: Session = Depends(get_trade_db)):
+    """
+    Create a new transaction and return its initial data.
+    """
+    try:
+        trade = generate_sample_trade(db)
+        return {
+            "message": "Transaction created successfully",
+            "trade_id": trade.trade_id,
+            "initial_data": get_trade_lineage(db, trade.trade_id)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error creating transaction: {str(e)}")
+
+
+@app.post("/api/transaction/promote/{trade_id}")
+async def promote_transaction(trade_id: str, db: Session = Depends(get_trade_db)):
+    """
+    Promote a transaction to the next stage.
+    """
+    try:
+        result = promote_trade(db, trade_id)
+        if "error" in result:
+            raise HTTPException(status_code=404, detail=result["error"])
+        return {
+            "message": "Transaction promoted successfully",
+            "updated_data": result
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error promoting transaction: {str(e)}")

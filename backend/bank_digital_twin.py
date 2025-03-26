@@ -1,14 +1,21 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Boolean
+from fastapi import FastAPI, HTTPException, Depends
+from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, ForeignKey, Boolean
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import sessionmaker, Session, relationship
 from datetime import datetime
 
+# Database setup
+DATABASE_URL = "sqlite:///./test.db"
+engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
+# Ensure tables are created
+Base.metadata.create_all(bind=engine)
+
+# Models
 class TradeExecution(Base):
-    """Front Office - Initial trade execution data"""
     __tablename__ = 'trade_execution'
-    
     id = Column(Integer, primary_key=True)
     trade_id = Column(String(50), unique=True, nullable=False)
     asset_class = Column(String(50), nullable=False)
@@ -17,92 +24,77 @@ class TradeExecution(Base):
     execution_timestamp = Column(DateTime, default=datetime.utcnow)
     status = Column(String(50), default="Executed")
     created_at = Column(DateTime, default=datetime.utcnow)
-    
+
     # Relationships
     validation = relationship("TradeValidation", back_populates="execution", uselist=False)
-    
+
     def __repr__(self):
         return f"<TradeExecution(trade_id='{self.trade_id}', counterparty='{self.counterparty}')>"
 
-
 class TradeValidation(Base):
-    """Middle Office - Trade validation and verification"""
     __tablename__ = 'trade_validation'
-    
     id = Column(Integer, primary_key=True)
     execution_id = Column(Integer, ForeignKey('trade_execution.id'), nullable=False)
     validation_status = Column(String(50), default="Pending")
     trade_ref_number = Column(String(100))
     settlement_date = Column(DateTime)
     validated_at = Column(DateTime, default=datetime.utcnow)
-    
+
     # Relationships
     execution = relationship("TradeExecution", back_populates="validation")
     enrichment = relationship("TradeEnrichment", back_populates="validation", uselist=False)
-    
+
     def __repr__(self):
         return f"<TradeValidation(id={self.id}, validation_status='{self.validation_status}')>"
 
-
 class TradeEnrichment(Base):
-    """Middle Office - Trade enrichment with market data"""
     __tablename__ = 'trade_enrichment'
-    
     id = Column(Integer, primary_key=True)
     validation_id = Column(Integer, ForeignKey('trade_validation.id'), nullable=False)
     market_data_source = Column(String(100))
     bond_yield = Column(Float)
     sector = Column(String(100))
     enriched_at = Column(DateTime, default=datetime.utcnow)
-    
+
     # Relationships
     validation = relationship("TradeValidation", back_populates="enrichment")
     risk_calculation = relationship("RiskCalculation", back_populates="enrichment", uselist=False)
-    
+
     def __repr__(self):
         return f"<TradeEnrichment(id={self.id}, market_data_source='{self.market_data_source}')>"
 
-
 class RiskCalculation(Base):
-    """Risk Management - Market and credit risk calculations"""
     __tablename__ = 'risk_calculation'
-    
     id = Column(Integer, primary_key=True)
     enrichment_id = Column(Integer, ForeignKey('trade_enrichment.id'), nullable=False)
-    market_risk_exposure = Column(Float)  # VaR
+    market_risk_exposure = Column(Float)
     credit_risk_exposure = Column(Float)
     calculation_timestamp = Column(DateTime, default=datetime.utcnow)
-    
+
     # Relationships
     enrichment = relationship("TradeEnrichment", back_populates="risk_calculation")
     settlement = relationship("SettlementPreparation", back_populates="risk_calculation", uselist=False)
-    
+
     def __repr__(self):
         return f"<RiskCalculation(id={self.id}, market_risk_exposure={self.market_risk_exposure})>"
 
-
 class SettlementPreparation(Base):
-    """Back Office - Settlement and payment processing"""
     __tablename__ = 'settlement_preparation'
-    
     id = Column(Integer, primary_key=True)
     risk_calculation_id = Column(Integer, ForeignKey('risk_calculation.id'), nullable=False)
     settlement_status = Column(String(50), default="Pending")
     payment_confirmation = Column(String(50), default="Awaiting")
     settlement_timestamp = Column(DateTime, default=datetime.utcnow)
-    
+
     # Relationships
     risk_calculation = relationship("RiskCalculation", back_populates="settlement")
     regulatory_reporting = relationship("RegulatoryReporting", back_populates="settlement", uselist=False)
-    
+
     def __repr__(self):
         return f"<SettlementPreparation(id={self.id}, settlement_status='{self.settlement_status}')>"
 
-
 class RegulatoryReporting(Base):
-    """Compliance - Regulatory reporting and compliance"""
     __tablename__ = 'regulatory_reporting'
-    
     id = Column(Integer, primary_key=True)
     settlement_id = Column(Integer, ForeignKey('settlement_preparation.id'), nullable=False)
     regulation = Column(String(100))
@@ -110,13 +102,20 @@ class RegulatoryReporting(Base):
     report_submission_date = Column(DateTime)
     is_submitted = Column(Boolean, default=False)
     reporting_timestamp = Column(DateTime, default=datetime.utcnow)
-    
+
     # Relationships
     settlement = relationship("SettlementPreparation", back_populates="regulatory_reporting")
-    
+
     def __repr__(self):
         return f"<RegulatoryReporting(id={self.id}, regulation='{self.regulation}', is_submitted={self.is_submitted})>"
 
+# Dependency
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 # Utility functions to query the full lineage of a trade
 def get_trade_lineage(db_session, trade_id):
@@ -200,7 +199,7 @@ def generate_sample_trade(db_session, trade_id=None):
         TradeExecution: The created trade execution object
     """
     import random
-    from datetime import datetime, timedelta
+    from datetime import datetime
     
     # Sample data for random generation
     asset_classes = ["Bond", "Equity", "Derivative", "FX", "Commodity"]
@@ -219,6 +218,8 @@ def generate_sample_trade(db_session, trade_id=None):
         execution_timestamp=datetime.utcnow(),
         status="Executed"
     )
+
+    print(trade)
     
     db_session.add(trade)
     db_session.commit()
@@ -228,7 +229,8 @@ def generate_sample_trade(db_session, trade_id=None):
 
 def promote_trade(db_session, trade_id, target_stage="regulatory_reporting"):
     """
-    Promote a trade through the lineage stages up to the specified target stage
+    Promote a trade through the lineage stages up to the specified target stage.
+    Each stage must be completed sequentially.
     
     Args:
         db_session: SQLAlchemy session
