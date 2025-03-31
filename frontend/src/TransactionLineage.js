@@ -21,7 +21,7 @@ function TransactionLineage() {
   
   // State for minimizable data panel
   const [isDataPanelMinimized, setIsDataPanelMinimized] = useState(false);
-  const [dataPanelPosition, setDataPanelPosition] = useState({ x: 0, y: 0 });
+  const [dataPanelPosition, setDataPanelPosition] = useState({ x: window.innerWidth - 380, y: 100 });
   const [isDraggingPanel, setIsDraggingPanel] = useState(false);
   const [panelStartPosition, setPanelStartPosition] = useState({ x: 0, y: 0 });
   const dataPanelRef = useRef(null);
@@ -101,6 +101,7 @@ function TransactionLineage() {
     setProcessingAnimation(false); // Stop any ongoing animations
     setDragPosition({ x: 0, y: 0 }); // Reset drag position
     setRiskImpact(null); // Clear risk impact data
+    setScale(1); // Reset zoom level
     
     // Remove from local storage
     localStorage.removeItem('transactionId');
@@ -134,7 +135,21 @@ function TransactionLineage() {
       const newX = e.clientX - panelStartPosition.x;
       const newY = e.clientY - panelStartPosition.y;
       
-      setDataPanelPosition({ x: newX, y: newY });
+      // Add boundaries to keep the panel within the viewport
+      const panel = dataPanelRef.current;
+      const panelWidth = panel ? panel.offsetWidth : 350;
+      const panelHeight = panel ? panel.offsetHeight : 500;
+      
+      // Calculate boundary limits
+      const maxX = window.innerWidth - 50; // Keep at least 50px visible on right
+      const minX = -panelWidth + 50; // Keep at least 50px visible on left
+      const maxY = window.innerHeight - 50; // Keep at least 50px visible on bottom
+      const minY = 50; // Keep at least 50px visible on top (below header)
+      
+      const boundedX = Math.min(Math.max(newX, minX), maxX);
+      const boundedY = Math.min(Math.max(newY, minY), maxY);
+      
+      setDataPanelPosition({ x: boundedX, y: boundedY });
     }
   };
   
@@ -160,11 +175,6 @@ function TransactionLineage() {
     });
   };
   
-  // Toggle data panel minimized state
-  const toggleDataPanel = () => {
-    setIsDataPanelMinimized(!isDataPanelMinimized);
-  };
-
   // Function to handle zoom in/out
   const handleZoom = (zoomIn) => {
     if (zoomIn) {
@@ -188,6 +198,11 @@ function TransactionLineage() {
 
   // Enable scrolling with the mouse pad
   const handleWheel = (e) => {
+    // Skip if the event originated in the floating panel
+    if (e.target.closest('.floating-data-panel')) {
+      return;
+    }
+    
     if (e.ctrlKey) {
       // Zoom in/out with Ctrl + Scroll
       handleZoom(e.deltaY < 0);
@@ -269,15 +284,122 @@ function TransactionLineage() {
     }
   };
 
-  // Load transaction from browser storage on component mount
+  // Combine the cleanup and the localStorage loading
   useEffect(() => {
-    const storedTransactionId = localStorage.getItem('transactionId');
-    const storedTransactionData = localStorage.getItem('transactionData');
-    if (storedTransactionId && storedTransactionData) {
-      setTransactionId(storedTransactionId);
-      setTransactionData(JSON.parse(storedTransactionData));
+    // By default, start with a clean state
+    const shouldStartClean = true; // Set this to true to always start with a clean session
+    
+    if (shouldStartClean) {
+      // Clear localStorage
+      localStorage.removeItem('transactionId');
+      localStorage.removeItem('transactionData');
+      
+      // Reset component state
+      setTransactionId(null);
+      setTransactionData(null);
+      setCurrentStep(-1);
+      setTransformations([]);
+      setProcessingAnimation(false);
+      setDragPosition({ x: 0, y: 0 });
+      setRiskImpact(null);
+      
+      // Reset visualization
+      centerVisualization();
+    } else {
+      // Try to restore from localStorage (previous session)
+      const storedTransactionId = localStorage.getItem('transactionId');
+      const storedTransactionData = localStorage.getItem('transactionData');
+      
+      // Add validation before restoring from localStorage
+      if (storedTransactionId && storedTransactionData) {
+        try {
+          // Check if the stored data is valid JSON and has the required structure
+          const parsedData = JSON.parse(storedTransactionData);
+          
+          // Only restore if we have valid tradeExecution data
+          if (parsedData && parsedData.tradeExecution) {
+            // Verify the transaction still exists on the server
+            const verifyTransaction = async () => {
+              try {
+                // Try to get transaction data from the server to verify it exists
+                await axios.get(`http://localhost:8000/api/transaction/${storedTransactionId}/verify`);
+                
+                // If successful, set the transaction data
+                setTransactionId(storedTransactionId);
+                setTransactionData(parsedData);
+                
+                // Determine current step based on which objects are present
+                let stepIndex = 0;
+                if (parsedData.regulatoryReporting) stepIndex = 5;
+                else if (parsedData.settlementPreparation) stepIndex = 4;
+                else if (parsedData.riskCalculation) stepIndex = 3;
+                else if (parsedData.tradeEnrichment) stepIndex = 2;
+                else if (parsedData.tradeValidation) stepIndex = 1;
+                
+                setCurrentStep(stepIndex);
+              } catch (error) {
+                console.log("Transaction no longer exists on server, clearing local data");
+                // Clear localStorage if the transaction doesn't exist on the server
+                localStorage.removeItem('transactionId');
+                localStorage.removeItem('transactionData');
+              }
+            };
+            
+            verifyTransaction().catch(() => {
+              // Fallback to use local data if server is unreachable
+              setTransactionId(storedTransactionId);
+              setTransactionData(parsedData);
+            });
+          } else {
+            // If the structure is invalid, clear localStorage
+            localStorage.removeItem('transactionId');
+            localStorage.removeItem('transactionData');
+          }
+        } catch (e) {
+          // If parsing fails, clear localStorage
+          console.error("Error parsing stored transaction data:", e);
+          localStorage.removeItem('transactionId');
+          localStorage.removeItem('transactionData');
+        }
+      }
     }
   }, []);
+
+  useEffect(() => {
+    // Initialize the panel position when component mounts
+    const initPanelPosition = () => {
+      // Position the panel at right side of the screen with some margin
+      const initialX = window.innerWidth - 380; // 350px width + 30px margin
+      const initialY = 100; // 100px from top
+      setDataPanelPosition({ x: initialX, y: initialY });
+    };
+
+    initPanelPosition();
+
+    // Reposition panel on window resize
+    const handleResize = () => {
+      // Update panel position when window resizes to keep it within bounds
+      setDataPanelPosition(prev => {
+        const panel = dataPanelRef.current;
+        const panelWidth = panel ? panel.offsetWidth : 350;
+        
+        // Keep the panel within the viewport
+        const maxX = window.innerWidth - 50;
+        const boundedX = Math.min(prev.x, maxX);
+        
+        return { x: boundedX, y: prev.y };
+      });
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Add handler to prevent scroll propagation in panel
+  const handlePanelScroll = (e) => {
+    // Stop the event from propagating to parent elements
+    e.stopPropagation();
+  };
 
   if (loading) {
     return <div className="loading"><i className="fas fa-spinner fa-spin"></i> Loading transaction data...</div>;
@@ -650,30 +772,40 @@ function TransactionLineage() {
         </div>
       </div>
       
-      {/* Replace "Transaction Data" panel with the transaction table */}
+      {/* Floating Transaction Data Panel */}
       <div 
-        className={`floating-data-panel vertical-panel ${isDataPanelMinimized ? 'minimized' : ''}`}
+        className="floating-data-panel"
         style={{
-          transform: `translateY(${dataPanelPosition.y}px)`
+          transform: `translate(${dataPanelPosition.x}px, ${dataPanelPosition.y}px)`,
+          width: isDataPanelMinimized ? '280px' : '350px',
+          height: 'auto',
+          maxHeight: '80vh'
         }}
         ref={dataPanelRef}
         onMouseDown={handlePanelMouseDown}
       >
         <div className="panel-header">
+          <div className="drag-handle">
+            <i className="fas fa-grip-lines"></i>
+          </div>
           <h3>Transaction Data</h3>
           <div className="panel-controls">
             <button 
               className="minimize-btn"
-              onClick={toggleDataPanel}
+              onClick={() => setIsDataPanelMinimized(!isDataPanelMinimized)}
               title={isDataPanelMinimized ? "Expand" : "Minimize"}
             >
-              <i className={`fas fa-${isDataPanelMinimized ? 'chevron-left' : 'chevron-right'}`}></i>
+              <i className={`fas fa-${isDataPanelMinimized ? 'expand' : 'compress'}`}></i>
             </button>
           </div>
         </div>
         
         {!isDataPanelMinimized && (
-          <div className="panel-body">
+          <div 
+            className="panel-body"
+            onWheel={handlePanelScroll}
+            onScroll={handlePanelScroll}
+          >
             <div className="transaction-table">
               {renderTransactionData()}
             </div>

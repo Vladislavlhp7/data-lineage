@@ -965,3 +965,16 @@ async def reset_transaction(trade_id: str, db: Session = Depends(get_trade_db)):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error resetting transaction: {str(e)}")
+
+# Add an endpoint to verify if a transaction exists
+@app.get("/api/transaction/{trade_id}/verify")
+async def verify_transaction(trade_id: str, db: Session = Depends(get_trade_db)):
+    """
+    Check if a transaction exists in the database.
+    Returns 200 OK if the transaction exists, 404 Not Found otherwise.
+    """
+    trade = db.query(TradeExecution).filter_by(trade_id=trade_id).first()
+    if not trade:
+        raise HTTPException(status_code=404, detail=f"Transaction {trade_id} not found")
+    
+    return {"exists": True, "trade_id": trade_id}

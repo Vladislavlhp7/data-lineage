@@ -174,156 +174,121 @@
 
 /* Floating Data Panel */
 .floating-data-panel {
-  position: fixed;
-  right: 2rem;
-  top: 7rem; /* Positioned below the header */
-  width: 400px;
+  position: absolute;
   background-color: white;
-  border-radius: 8px;
-  box-shadow: 0 5px 20px rgba(0,0,0,0.15);
-  z-index: 90;
+  border-radius: 10px;
+  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
+  z-index: 1000;
+  overflow: hidden;
   transition: width 0.3s ease, height 0.3s ease;
-  overflow: hidden;
-  resize: both;
-  max-height: calc(100vh - 9rem);
-}
-
-.floating-data-panel.minimized {
-  width: 200px;
-  height: auto !important;
-}
-
-/* Vertical Data Panel */
-.floating-data-panel.vertical-panel {
-  position: fixed;
-  right: 0;
-  top: 6rem; /* Below the header */
-  width: 350px;
-  height: calc(100vh - 7rem);
-  background-color: white;
-  border-radius: 8px 0 0 8px;
-  box-shadow: -5px 0 20px rgba(0,0,0,0.15);
-  z-index: 90;
-  transition: transform 0.3s ease, width 0.3s ease;
-  overflow: hidden;
-  transform: translateY(0);
-}
-
-.floating-data-panel.vertical-panel.minimized {
-  width: 40px;
-  height: auto !important;
-}
-
-.floating-data-panel.vertical-panel .panel-header {
-  cursor: ns-resize;
-  border-radius: 8px 0 0 0;
-  padding: 0.75rem;
-}
-
-.floating-data-panel.vertical-panel .panel-body {
-  height: calc(100% - 3rem);
-  overflow-y: auto;
-  overflow-x: hidden;
-  overscroll-behavior: contain; /* Prevent scrolling the playground */
-  pointer-events: auto; /* Ensure interaction is limited to the panel */
-}
-
-.floating-data-panel.vertical-panel .minimize-btn i {
-  transition: transform 0.3s;
-}
-
-.floating-data-panel.vertical-panel.minimized .panel-header {
-  writing-mode: vertical-lr;
-  text-orientation: mixed;
-  height: auto;
-  padding: 1rem 0.5rem;
+  resize: none;
   display: flex;
   flex-direction: column;
-  align-items: center;
+  max-height: 80vh;
+  width: 350px;
+  border: 1px solid #e0e0e0;
 }
 
-.floating-data-panel.vertical-panel.minimized .panel-header h3 {
-  transform: rotate(180deg);
-  margin-bottom: 1rem;
-}
-
-.floating-data-panel.vertical-panel.minimized .minimize-btn {
-  transform: rotate(180deg);
-}
-
-.panel-header {
+.floating-data-panel .panel-header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding: 0.75rem 1rem;
-  background-color: #3498db;
-  color: white;
+  padding: 12px 15px;
+  background: linear-gradient(to right, #f8f9fa, #ffffff);
+  border-bottom: 1px solid #e0e0e0;
   cursor: move;
   user-select: none;
 }
 
-.panel-header h3 {
+.floating-data-panel .panel-header h3 {
   margin: 0;
-  font-size: 1rem;
+  font-size: 16px;
+  flex-grow: 1;
+  color: #333;
 }
 
-.panel-controls {
+.floating-data-panel .panel-controls {
   display: flex;
-  gap: 0.5rem;
+  gap: 8px;
 }
 
-.minimize-btn {
+.floating-data-panel .panel-body {
+  padding: 15px;
+  overflow-y: auto;
+  flex-grow: 1;
+  max-height: calc(80vh - 50px);
+  overscroll-behavior: contain; /* Prevent overscroll effects from propagating */
+}
+
+.floating-data-panel .drag-handle {
+  margin-right: 10px;
+  color: #999;
+  cursor: move;
+}
+
+.floating-data-panel .minimize-btn {
   background: none;
   border: none;
-  color: white;
+  color: #666;
   cursor: pointer;
-  padding: 0.25rem;
+  padding: 5px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 3px;
-  transition: background-color 0.2s;
+  border-radius: 4px;
 }
 
-.minimize-btn:hover {
-  background-color: rgba(255, 255, 255, 0.2);
+.floating-data-panel .minimize-btn:hover {
+  background-color: #f0f0f0;
+  color: #333;
 }
 
-.panel-body {
-  padding: 1rem;
-  overflow-y: auto;
-  max-height: calc(100% - 3rem);
-}
-
-/* Data table */
-.data-table {
+/* Transaction data table styling */
+.transaction-table {
   width: 100%;
+  overflow-x: hidden;
 }
 
-.data-table table {
+.transaction-section {
+  margin-bottom: 20px;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid #e6e6e6;
+}
+
+.transaction-section h4 {
+  margin: 0;
+  padding: 10px 15px;
+  background-color: #f8f9fa;
+  font-size: 14px;
+  font-weight: 600;
+  color: #495057;
+  border-bottom: 1px solid #e6e6e6;
+}
+
+.transaction-section table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.9rem;
+  font-size: 13px;
 }
 
-.data-table th {
-  background-color: #f8f9fa;
-  padding: 0.5rem;
-  text-align: left;
-  border-bottom: 2px solid #ddd;
-  position: sticky;
-  top: 0;
-  z-index: 10;
+.transaction-section td {
+  padding: 8px 15px;
+  border-bottom: 1px solid #f2f2f2;
 }
 
-.data-table td {
-  padding: 0.5rem;
-  border-bottom: 1px solid #eee;
-  font-size: 0.85rem;
+.transaction-section tr:last-child td {
+  border-bottom: none;
 }
 
-.data-table tr.highlight-row {
-  background-color: rgba(52, 152, 219, 0.1);
+.transaction-section td:first-child {
+  font-weight: 500;
+  color: #666;
+  width: 40%;
+}
+
+.transaction-section td:last-child {
+  color: #333;
+  word-break: break-word;
 }
 
 /* Transaction flow visualization */
