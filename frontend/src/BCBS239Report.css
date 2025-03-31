@@ -293,4 +293,155 @@ th {
     .report-footer {
         flex-direction: column;
     }
+}
+
+.risk-summary-cards {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 30px;
+    gap: 20px;
+}
+
+.summary-card {
+    flex: 1;
+    background-color: white;
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+    text-align: center;
+    transition: transform 0.2s;
+}
+
+.summary-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+}
+
+.summary-card h3 {
+    margin-top: 0;
+    color: #2c3e50;
+    font-size: 18px;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 10px;
+    margin-bottom: 15px;
+}
+
+.summary-card .avg-value {
+    font-size: 36px;
+    font-weight: bold;
+    margin: 15px 0;
+}
+
+.summary-card:nth-child(1) .avg-value {
+    color: #e74c3c; /* Credit risk color */
+}
+
+.summary-card:nth-child(2) .avg-value {
+    color: #3498db; /* Market risk color */
+}
+
+.summary-card p {
+    color: #7f8c8d;
+    font-size: 14px;
+    margin-bottom: 0;
+}
+
+/* Loading state styling */
+.loading-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 400px;
+}
+
+.loading-spinner {
+    text-align: center;
+}
+
+.loading-spinner i {
+    font-size: 48px;
+    color: #3498db;
+    margin-bottom: 15px;
+}
+
+.loading-spinner p {
+    font-size: 18px;
+    color: #7f8c8d;
+}
+
+/* Error state styling */
+.error-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 400px;
+}
+
+.error-message {
+    text-align: center;
+    max-width: 400px;
+    padding: 30px;
+    background-color: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 15px rgba(0, 0, 0, 0.1);
+}
+
+.error-message i {
+    font-size: 48px;
+    color: #e74c3c;
+    margin-bottom: 15px;
+}
+
+.error-message p {
+    font-size: 16px;
+    color: #7f8c8d;
+    margin-bottom: 20px;
+}
+
+.retry-btn {
+    padding: 10px 20px;
+    background-color: #3498db;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 16px;
+    transition: background-color 0.2s;
+}
+
+.retry-btn:hover {
+    background-color: #2980b9;
+}
+
+.retry-btn i {
+    font-size: 14px;
+    color: white;
+    margin-right: 5px;
+}
+
+/* Status indicator colors */
+.status-indicator.warning {
+    background-color: #f39c12;
+    color: white;
+}
+
+.status-indicator.non-compliant {
+    background-color: #e74c3c;
+    color: white;
+}
+
+.status-indicator.unknown {
+    background-color: #95a5a6;
+    color: white;
+}
+
+/* Make the report responsive for smaller screens */
+@media (max-width: 768px) {
+    .risk-summary-cards {
+        flex-direction: column;
+    }
+    
+    .summary-card {
+        margin-bottom: 15px;
+    }
 } 

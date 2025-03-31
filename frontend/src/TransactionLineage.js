@@ -29,6 +29,9 @@ function TransactionLineage() {
   // Add state for visualization scale
   const [scale, setScale] = useState(1);
   
+  // Add state for risk impact
+  const [riskImpact, setRiskImpact] = useState(null);
+  
   // Fetch transaction steps and initialize a transaction
   useEffect(() => {
     const initializeTransaction = async () => {
@@ -62,18 +65,49 @@ function TransactionLineage() {
     }
     setLoading(true);
     try {
-      const response = await axios.get(`http://localhost:8000/transaction/${transactionId}/reset`);
-      setTransactionData(response.data.data); // Reset transaction data
-      setCurrentStep(0); // Reset to the first step
-      setTransformations([]); // Clear transformations
-      setProcessingAnimation(false); // Stop any ongoing animations
-      setDragPosition({ x: 0, y: 0 }); // Reset drag position
+      // Try to use the server-side reset endpoint first
+      try {
+        const response = await axios.get(`http://localhost:8000/transaction/${transactionId}/reset`);
+        if (response.data && response.data.trade_id) {
+          // If server reset was successful, update with the new data
+          setTransactionId(response.data.trade_id);
+          setTransactionData(response.data.data);
+          setCurrentStep(0); // Reset to the first step
+          localStorage.setItem('transactionId', response.data.trade_id);
+          localStorage.setItem('transactionData', JSON.stringify(response.data.data));
+        } else {
+          // Fallback to client-side reset if server returns unexpected data
+          clientSideReset();
+        }
+      } catch (error) {
+        console.log('Server reset failed, falling back to client-side reset');
+        clientSideReset();
+      }
     } catch (error) {
       console.error('Error resetting transaction:', error);
       alert('Failed to reset transaction. Please try again.');
     } finally {
       setLoading(false);
     }
+  };
+  
+  // Helper function for client-side reset
+  const clientSideReset = () => {
+    // Clear all data and create clean slate
+    setTransactionId(null);
+    setTransactionData(null);
+    setCurrentStep(-1); // Reset to no step selected
+    setTransformations([]); // Clear transformations
+    setProcessingAnimation(false); // Stop any ongoing animations
+    setDragPosition({ x: 0, y: 0 }); // Reset drag position
+    setRiskImpact(null); // Clear risk impact data
+    
+    // Remove from local storage
+    localStorage.removeItem('transactionId');
+    localStorage.removeItem('transactionData');
+    
+    // Reset visualization
+    centerVisualization();
   };
   
   // Mouse event handlers for dragging the background visualization
@@ -181,6 +215,12 @@ function TransactionLineage() {
       setTransactionData(response.data.initial_data); // Populate the entire transaction data
       setCurrentStep(0); // Reset currentStep to 0 for the new transaction
       setTransformations([]); // Clear transformations
+      
+      // Store risk impact data
+      if (response.data.risk_impact) {
+        setRiskImpact(response.data.risk_impact);
+      }
+      
       localStorage.setItem('transactionId', response.data.trade_id); // Store in browser
       localStorage.setItem('transactionData', JSON.stringify(response.data.initial_data));
     } catch (error) {
@@ -211,6 +251,11 @@ function TransactionLineage() {
         settlementPreparation: updatedData.settlement_preparation,
         regulatoryReporting: updatedData.regulatory_reporting,
       });
+      
+      // Update risk impact data
+      if (response.data.risk_impact) {
+        setRiskImpact(response.data.risk_impact);
+      }
 
       // Mark the current step as completed and move to the next step
       setTimeout(() => {
@@ -291,6 +336,62 @@ function TransactionLineage() {
     ));
   };
 
+  // Render risk impact information
+  const renderRiskImpact = () => {
+    if (!riskImpact || riskImpact.status !== "success" || !riskImpact.updates || riskImpact.updates.length === 0) {
+      return (
+        <div className="risk-impact-section">
+          <h4>Risk Impact</h4>
+          <p>No risk impact data available for this transaction.</p>
+        </div>
+      );
+    }
+    
+    return (
+      <div className="risk-impact-section">
+        <h4>Risk Impact</h4>
+        <div className="transaction-details">
+          <p><strong>Trade ID:</strong> {riskImpact.transaction.trade_id}</p>
+          <p><strong>Asset Class:</strong> {riskImpact.transaction.asset_class}</p>
+          <p><strong>Notional:</strong> ${riskImpact.transaction.notional.toLocaleString()}</p>
+          <p><strong>Stage:</strong> {riskImpact.transaction.stage}</p>
+        </div>
+        
+        <div className="risk-updates">
+          <h5>Risk Changes</h5>
+          <table className="risk-table">
+            <thead>
+              <tr>
+                <th>Risk Type</th>
+                <th>Previous</th>
+                <th>New</th>
+                <th>Change</th>
+                <th>Trend</th>
+              </tr>
+            </thead>
+            <tbody>
+              {riskImpact.updates.map((update, index) => (
+                <tr key={index}>
+                  <td>{update.risk_type.replace('_', ' ')}</td>
+                  <td>{update.old_value}</td>
+                  <td>{update.new_value}</td>
+                  <td className={update.change > 0 ? 'negative-change' : 'positive-change'}>
+                    {update.change > 0 ? '+' : ''}{update.change}
+                  </td>
+                  <td>
+                    {update.trend === 'increasing' && <span className="trend-up">↑</span>}
+                    {update.trend === 'decreasing' && <span className="trend-down">↓</span>}
+                    {update.trend === 'stable' && <span className="trend-stable">→</span>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  };
+
   // Render the transaction data in the data panel
   const renderTransactionData = () => {
     if (!transactionData) return null;
@@ -304,23 +405,28 @@ function TransactionLineage() {
       { title: "Regulatory Reporting", data: transactionData.regulatoryReporting },
     ];
 
-    return sections.map((section, index) => (
-      section.data && (
-        <div key={index} className="transaction-section">
-          <h4>{section.title}</h4>
-          <table>
-            <tbody>
-              {Object.entries(section.data).map(([key, value]) => (
-                <tr key={key}>
-                  <td>{key}</td>
-                  <td>{value !== null ? value.toString() : "N/A"}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )
-    ));
+    return (
+      <>
+        {renderRiskImpact()}
+        {sections.map((section, index) => (
+          section.data && (
+            <div key={index} className="transaction-section">
+              <h4>{section.title}</h4>
+              <table>
+                <tbody>
+                  {Object.entries(section.data).map(([key, value]) => (
+                    <tr key={key}>
+                      <td>{key}</td>
+                      <td>{value !== null ? value.toString() : "N/A"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )
+        ))}
+      </>
+    );
   };
 
   // Replace the "Transaction Data" panel with the transaction table
@@ -507,30 +613,39 @@ function TransactionLineage() {
         <div className="header-content">
           <h1>Transaction Lineage Simulation</h1>
           <div className="header-controls">
-            <button onClick={createTransaction} disabled={loading} className="start-btn">
-              {loading ? 'Starting...' : 'Start Transaction'}
-            </button>
-            {currentStep < steps.length - 1 ? (
-              <button 
-                className="next-step-btn" 
-                onClick={promoteTransaction}
-                disabled={processingAnimation || !transactionId}
-              >
-                {processingAnimation ? (
-                  <><i className="fas fa-spinner fa-spin"></i> Processing...</>
+            {!transactionId ? (
+              <button onClick={createTransaction} disabled={loading} className="start-transaction-btn">
+                {loading ? (
+                  <><i className="fas fa-spinner fa-spin"></i> Starting...</>
                 ) : (
-                  <>Process to Next Step <i className="fas fa-arrow-right"></i></>
+                  <><i className="fas fa-play-circle"></i> Start Transaction</>
                 )}
               </button>
             ) : (
-              <div className="completion-badge">
-                <i className="fas fa-check-circle"></i>
-                <span>Completed</span>
+              <div className="transaction-buttons">
+                {currentStep < steps.length - 1 ? (
+                  <button 
+                    className="next-step-btn" 
+                    onClick={promoteTransaction}
+                    disabled={processingAnimation}
+                  >
+                    {processingAnimation ? (
+                      <><i className="fas fa-spinner fa-spin"></i> Processing...</>
+                    ) : (
+                      <>Process To Next Step <i className="fas fa-arrow-right"></i></>
+                    )}
+                  </button>
+                ) : (
+                  <div className="completion-badge">
+                    <i className="fas fa-check-circle"></i>
+                    <span>Completed</span>
+                  </div>
+                )}
+                <button onClick={resetSimulation} className="reset-btn">
+                  <i className="fas fa-redo"></i> Reset
+                </button>
               </div>
             )}
-            <button onClick={resetSimulation} className="reset-btn">
-              <i className="fas fa-redo"></i> Reset
-            </button>
           </div>
         </div>
       </div>

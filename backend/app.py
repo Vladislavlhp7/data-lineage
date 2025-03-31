@@ -1,9 +1,9 @@
-from fastapi import FastAPI, UploadFile, File as FastAPIFile, HTTPException, Depends
+from fastapi import FastAPI, UploadFile, File as FastAPIFile, HTTPException, Depends, Query
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import create_engine, Column, Integer, String, Text, ForeignKey, DateTime
+from sqlalchemy import create_engine, Column, Integer, String, Text, ForeignKey, DateTime, func, text
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, relationship
+from sqlalchemy.orm import sessionmaker, relationship, Session
 from pydantic import BaseModel
 import os
 import difflib
@@ -11,11 +11,13 @@ import requests
 import chardet
 from datetime import datetime
 import shutil
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 import io
 import random
 import docx  # Import for DOCX support
 from dotenv import load_dotenv  # Add this import
+import sqlite3
+import pandas as pd
 
 # Add these imports for transaction simulation
 import uuid
@@ -24,6 +26,9 @@ from datetime import datetime, timedelta
 import json
 from typing import Dict, List, Any, Optional
 from pydantic import BaseModel
+
+# Import get_db from bank_digital_twin for consistent DB connections
+from bank_digital_twin import get_db as get_trade_db
 
 # Load environment variables from .env file
 load_dotenv()
@@ -49,7 +54,31 @@ engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
-# Database models
+# Default risk database path
+DEFAULT_RISK_DB_PATH = "./bank_digital_twin.db"
+
+# BCBS 239 related models
+class RiskMetric(BaseModel):
+    risk_type: str
+    value: float
+    rwa: Optional[float] = None
+    trend: Optional[str] = None
+    reporting_date: str
+
+class CapitalRatio(BaseModel):
+    ratio_type: str
+    value: float
+    status: str
+    reporting_date: str
+
+class BCBSSummary(BaseModel):
+    credit_risk_avg: float
+    market_risk_avg: float
+    latest_metrics: List[RiskMetric]
+    capital_ratios: List[CapitalRatio]
+    reporting_date: str
+
+# Database models (Files DB)
 class FileModel(Base):
     __tablename__ = "files"
     id = Column(Integer, primary_key=True, index=True)
@@ -724,10 +753,13 @@ async def create_transaction(db: Session = Depends(get_trade_db)):
     """
     try:
         trade = generate_sample_trade(db)
+        lineage_data = get_trade_lineage(db, trade.trade_id)
+        
         return {
             "message": "Transaction created successfully",
             "trade_id": trade.trade_id,
-            "initial_data": get_trade_lineage(db, trade.trade_id)
+            "initial_data": lineage_data,
+            "risk_impact": lineage_data.get("risk_impacts", {})
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error creating transaction: {str(e)}")
@@ -742,9 +774,194 @@ async def promote_transaction(trade_id: str, db: Session = Depends(get_trade_db)
         result = promote_trade(db, trade_id)
         if "error" in result:
             raise HTTPException(status_code=404, detail=result["error"])
+        
         return {
             "message": "Transaction promoted successfully",
-            "updated_data": result
+            "updated_data": result,
+            "risk_impact": result.get("risk_impacts", {})
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error promoting transaction: {str(e)}")
+
+# New BCBS 239 API Endpoints using the existing bank_digital_twin database
+@app.get("/bcbs/summary", response_model=BCBSSummary)
+async def get_bcbs_summary(db: Session = Depends(get_trade_db)):
+    """Get BCBS 239 summary including risk metrics and capital ratios"""
+    try:
+        # Execute SQL queries directly using SQLAlchemy connection
+        # Get average credit risk
+        credit_risk_avg_query = text("""
+        SELECT AVG(value) as avg_value 
+        FROM risk_metrics 
+        WHERE risk_type = 'credit_risk'
+        """)
+        credit_risk_avg_result = db.execute(credit_risk_avg_query).fetchone()
+        credit_risk_avg_value = credit_risk_avg_result[0] if credit_risk_avg_result else 0
+        
+        # Get average market risk
+        market_risk_avg_query = text("""
+        SELECT AVG(value) as avg_value 
+        FROM risk_metrics 
+        WHERE risk_type = 'market_risk'
+        """)
+        market_risk_avg_result = db.execute(market_risk_avg_query).fetchone()
+        market_risk_avg_value = market_risk_avg_result[0] if market_risk_avg_result else 0
+        
+        # Get latest date in the database
+        latest_date_query = text("""
+        SELECT MAX(reporting_date) as latest_date 
+        FROM risk_metrics
+        """)
+        latest_date_result = db.execute(latest_date_query).fetchone()
+        reporting_date = latest_date_result[0] if latest_date_result else datetime.now().strftime("%Y-%m-%d")
+        
+        # Get latest risk metrics
+        latest_metrics_query = text("""
+        SELECT risk_type, value, rwa, trend, reporting_date
+        FROM risk_metrics
+        WHERE reporting_date = :reporting_date
+        ORDER BY risk_type
+        """)
+        latest_metrics_rows = db.execute(latest_metrics_query, {"reporting_date": reporting_date}).fetchall()
+        latest_metrics = [
+            RiskMetric(
+                risk_type=row[0],
+                value=row[1],
+                rwa=row[2],
+                trend=row[3],
+                reporting_date=row[4]
+            ) for row in latest_metrics_rows
+        ]
+        
+        # Get capital ratios
+        capital_ratios_query = text("""
+        SELECT ratio_type, value, status, reporting_date
+        FROM capital_ratios
+        WHERE reporting_date = :reporting_date
+        """)
+        capital_ratios_rows = db.execute(capital_ratios_query, {"reporting_date": reporting_date}).fetchall()
+        capital_ratios = [
+            CapitalRatio(
+                ratio_type=row[0],
+                value=row[1],
+                status=row[2],
+                reporting_date=row[3]
+            ) for row in capital_ratios_rows
+        ]
+        
+        return BCBSSummary(
+            credit_risk_avg=round(credit_risk_avg_value, 2),
+            market_risk_avg=round(market_risk_avg_value, 2),
+            latest_metrics=latest_metrics,
+            capital_ratios=capital_ratios,
+            reporting_date=reporting_date
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting BCBS summary: {str(e)}")
+
+@app.get("/bcbs/risk-trends/{risk_type}")
+async def get_risk_trends(risk_type: str, days: int = 30, db: Session = Depends(get_trade_db)):
+    """Get historical trend data for a specific risk type"""
+    try:
+        # Get historical data
+        query = text("""
+        SELECT reporting_date, value, rwa, trend
+        FROM risk_metrics
+        WHERE risk_type = :risk_type
+        ORDER BY reporting_date DESC
+        LIMIT :days
+        """)
+        rows = db.execute(query, {"risk_type": risk_type, "days": days}).fetchall()
+        
+        # Convert to list of dicts
+        trends = [
+            {
+                "reporting_date": row[0],
+                "value": row[1],
+                "rwa": row[2],
+                "trend": row[3]
+            } for row in rows
+        ]
+        
+        return {
+            "risk_type": risk_type,
+            "days": days,
+            "trends": trends
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting risk trends: {str(e)}")
+
+@app.get("/bcbs/risk-sources/{risk_type}")
+async def get_risk_sources(risk_type: str, db: Session = Depends(get_trade_db)):
+    """Get risk sources for a specific risk type on the latest date"""
+    try:
+        # Get latest date
+        latest_date_query = text("""
+        SELECT MAX(reporting_date) as latest_date 
+        FROM risk_metrics
+        WHERE risk_type = :risk_type
+        """)
+        latest_date_result = db.execute(latest_date_query, {"risk_type": risk_type}).fetchone()
+        reporting_date = latest_date_result[0] if latest_date_result else None
+        
+        if not reporting_date:
+            return {"risk_type": risk_type, "sources": []}
+        
+        # Get latest risk metric ID
+        metric_id_query = text("""
+        SELECT id 
+        FROM risk_metrics
+        WHERE risk_type = :risk_type AND reporting_date = :reporting_date
+        LIMIT 1
+        """)
+        metric_result = db.execute(metric_id_query, {"risk_type": risk_type, "reporting_date": reporting_date}).fetchone()
+        
+        if not metric_result:
+            return {"risk_type": risk_type, "sources": []}
+        
+        metric_id = metric_result[0]
+        
+        # Get risk sources
+        sources_query = text("""
+        SELECT source_name, contribution_pct
+        FROM risk_sources
+        WHERE risk_metric_id = :metric_id
+        ORDER BY contribution_pct DESC
+        """)
+        sources_rows = db.execute(sources_query, {"metric_id": metric_id}).fetchall()
+        
+        # Convert to list of dicts
+        sources_list = [{"source": row[0], "contribution": row[1]} for row in sources_rows]
+        
+        return {
+            "risk_type": risk_type,
+            "reporting_date": reporting_date,
+            "sources": sources_list
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting risk sources: {str(e)}")
+
+# Add a new endpoint to reset a transaction
+@app.get("/transaction/{trade_id}/reset")
+async def reset_transaction(trade_id: str, db: Session = Depends(get_trade_db)):
+    """
+    Reset a transaction to its initial state.
+    This is a simplified implementation that creates a new transaction to replace the existing one.
+    """
+    try:
+        # Check if the transaction exists
+        existing_trade = db.query(TradeExecution).filter_by(trade_id=trade_id).first()
+        if not existing_trade:
+            raise HTTPException(status_code=404, detail=f"Transaction {trade_id} not found")
+        
+        # Create a new transaction (reusing the same trade_id would be an alternative)
+        new_trade = generate_sample_trade(db)
+        initial_data = get_trade_lineage(db, new_trade.trade_id)
+        
+        return {
+            "message": "Transaction reset successfully",
+            "trade_id": new_trade.trade_id,
+            "data": initial_data
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error resetting transaction: {str(e)}")

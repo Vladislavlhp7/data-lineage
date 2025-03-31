@@ -1463,3 +1463,200 @@
   top: 0rem; /* Matches the height of the app-header */
   z-index: 99; /* Ensures it stays above other elements */
 }
+
+/* Add these styles for the risk impact section */
+.risk-impact-section {
+  margin-bottom: 20px;
+  padding: 15px;
+  background-color: #f8f9fa;
+  border-radius: 5px;
+  border-left: 4px solid #5a75db;
+}
+
+.risk-impact-section h4 {
+  color: #333;
+  margin-top: 0;
+  margin-bottom: 15px;
+  font-size: 16px;
+}
+
+.transaction-details {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 15px;
+  font-size: 12px;
+}
+
+.transaction-details p {
+  margin: 0;
+}
+
+.risk-updates h5 {
+  font-size: 14px;
+  margin-top: 10px;
+  margin-bottom: 10px;
+  color: #444;
+}
+
+.risk-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.risk-table th {
+  background-color: #eef0f7;
+  padding: 8px;
+  text-align: left;
+  color: #666;
+  font-weight: 600;
+}
+
+.risk-table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.positive-change {
+  color: #28a745;
+  font-weight: 600;
+}
+
+.negative-change {
+  color: #dc3545;
+  font-weight: 600;
+}
+
+.trend-up {
+  color: #dc3545;
+  font-weight: bold;
+}
+
+.trend-down {
+  color: #28a745;
+  font-weight: bold;
+}
+
+.trend-stable {
+  color: #6c757d;
+  font-weight: bold;
+}
+
+/* Transaction Button Styles */
+.start-transaction-btn {
+  background: linear-gradient(135deg, #4d94ff, #1e56b0);
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 50px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(29, 86, 176, 0.3);
+  min-width: 200px;
+}
+
+.start-transaction-btn:hover {
+  background: linear-gradient(135deg, #5f9dff, #2561c3);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(29, 86, 176, 0.4);
+}
+
+.start-transaction-btn:active {
+  transform: translateY(1px);
+  box-shadow: 0 2px 8px rgba(29, 86, 176, 0.4);
+}
+
+.start-transaction-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.start-transaction-btn i {
+  font-size: 18px;
+}
+
+.transaction-buttons {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Improved Next Step Button */
+.next-step-btn {
+  background: linear-gradient(135deg, #27ae60, #2ecc71);
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 30px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(46, 204, 113, 0.3);
+}
+
+.next-step-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #2ecc71, #27ae60);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 15px rgba(46, 204, 113, 0.4);
+}
+
+.next-step-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  background: linear-gradient(135deg, #95a5a6, #7f8c8d);
+  box-shadow: none;
+}
+
+/* Improved Reset Button */
+.reset-btn {
+  background: #ecf0f1;
+  color: #34495e;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 30px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.reset-btn:hover {
+  background: #d6dbdf;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.reset-btn:active {
+  transform: translateY(1px);
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.1);
+}
+
+/* Improved Completion Badge */
+.completion-badge {
+  background: linear-gradient(135deg, #3498db, #2980b9);
+  color: white;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border-radius: 30px;
+  font-weight: 600;
+  font-size: 14px;
+  box-shadow: 0 4px 12px rgba(52, 152, 219, 0.3);
+}
