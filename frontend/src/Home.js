@@ -121,6 +121,15 @@ function Home() {
                     </div>
                 </div>
                 
+                <div className="demo-card highlighted">
+                    <div className="new-badge">New</div>
+                    <h2>Risk Data Lineage</h2>
+                    <p>Visualize how risk metrics are composed from individual transactions</p>
+                    <Link to="/risk-lineage" className="demo-btn primary">
+                        <i className="fas fa-project-diagram"></i> Explore Risk Lineage
+                    </Link>
+                </div>
+                
                 <div className="demo-card">
                     <h2>Transaction Lineage</h2>
                     <p>Visualize how a transaction flows through different departments</p>

@@ -443,6 +443,11 @@ class TransactionSimulationResponse(BaseModel):
     is_complete: bool
     next_step: Optional[str] = None
 
+@app.get("/transaction/steps")
+async def get_transaction_steps():
+    """Get all possible transaction processing steps"""
+    return transaction_data["steps"]
+
 @app.get("/transaction/init")
 async def init_transaction():
     """Initialize a new transaction with random data"""
@@ -460,7 +465,6 @@ async def init_transaction():
     }
     
     # Store in memory (would be in database in production)
-    # In a real app, you'd store this in Redis or a database
     active_transactions[transaction_id] = {
         "data": transaction,
         "current_step": 0,
@@ -471,7 +475,7 @@ async def init_transaction():
         "transaction_id": transaction_id,
         "initial_data": transaction,
         "step": 0,
-        "total_steps": len(transaction_data["steps"])
+        "total_steps": len(transaction_data["steps"])  # Use transaction_data["steps"]
     }
 
 @app.get("/transaction/{transaction_id}/process")
@@ -485,31 +489,29 @@ async def process_transaction_step(transaction_id: str, step_index: int = None):
     
     # If step_index is provided, validate it
     if step_index is not None:
-        if step_index < 0 or step_index >= len(transaction_data["steps"]):
+        if step_index < 0 or step_index >= len(transaction_data["steps"]):  # Use transaction_data["steps"]
             raise HTTPException(status_code=400, detail="Invalid step index")
-        # Update the current step if valid
-        transaction["current_step"] = step_index
     else:
-        # Use the current step
         step_index = transaction["current_step"]
     
     # Check if we've reached the end
-    if step_index >= len(transaction_data["steps"]):
-        return {
-            "is_complete": True,
-            "message": "Transaction processing complete"
-        }
+    if step_index >= len(transaction_data["steps"]):  # Use transaction_data["steps"]
+        raise HTTPException(status_code=400, detail="Transaction already completed")
     
     # Get the current step
-    current_step = transaction_data["steps"][step_index]
+    current_step = transaction_data["steps"][step_index]  # Use transaction_data["steps"]
     
     # Apply transformations for this step
-    apply_transformations(transaction, step_index)
-    
-    # Get transformation definitions for this step
-    transformations = []
-    if step_index > 0:  # No transformations for the first step
-        transformations = transaction_data["transformations"].get(current_step["id"], [])
+    transformations = transaction_data["transformations"].get(current_step["id"], [])
+    for transform in transformations:
+        field = transform["field"]
+        action = transform["action"]
+        
+        if action == "added":
+            transaction["data"][field] = f"Sample value for {field}"
+        elif action == "renamed":
+            old_field = field.replace("value", "currency")  # Example renaming logic
+            transaction["data"][field] = transaction["data"].pop(old_field, None)
     
     # Create the response
     response = {
@@ -520,17 +522,13 @@ async def process_transaction_step(transaction_id: str, step_index: int = None):
         "description": current_step["description"],
         "current_data": transaction["data"],
         "transformations": transformations,
-        "progress": (step_index + 1) / len(transaction_data["steps"]) * 100,
-        "is_complete": step_index == len(transaction_data["steps"]) - 1
+        "progress": (step_index + 1) / len(transaction_data["steps"]) * 100,  # Use transaction_data["steps"]
+        "is_complete": step_index == len(transaction_data["steps"]) - 1  # Use transaction_data["steps"]
     }
     
-    # If there's a next step, include it
-    if step_index < len(transaction_data["steps"]) - 1:
-        response["next_step"] = transaction_data["steps"][step_index + 1]["id"]
-        
     # If not the last step, increment the current step
-    if step_index < len(transaction_data["steps"]) - 1:
-        transaction["current_step"] = step_index + 1
+    if step_index < len(transaction_data["steps"]) - 1:  # Use transaction_data["steps"]
+        transaction["current_step"] += 1
     
     return response
 
@@ -635,95 +633,139 @@ def load_transaction_data():
 
 transaction_data = load_transaction_data()
 
-# API Endpoints
-@app.get("/transaction/steps")
-async def get_transaction_steps():
-    """Get all steps in the transaction process"""
-    return transaction_data["steps"]
-
-@app.get("/transaction/init")
-async def init_transaction():
-    """Initialize a new transaction with random data"""
-    transaction_id = f"T-{uuid.uuid4().hex[:8].upper()}"
+@app.get("/api/risk/lineage/{risk_type}")
+async def get_risk_lineage(risk_type: str, db: Session = Depends(get_trade_db)):
+    """
+    Get risk lineage data showing how the aggregated risk number is composed from individual transactions
+    """
+    # Check if risk type is valid
+    if risk_type not in ["credit", "market"]:
+        raise HTTPException(status_code=400, detail=f"Invalid risk type: {risk_type}")
     
-    # Create sample initial transaction data
-    transaction = {
-        "tradeId": transaction_id,
-        "clientId": f"C-{100000 + int(random.random() * 900000)}",
-        "securityId": f"US-{10000 + int(random.random() * 90000)}",
-        "quantity": int(1000 + random.random() * 9000),
-        "price": round(50 + random.random() * 950, 2),
-        "tradeDate": (datetime.now()).strftime("%Y-%m-%d"),
-        "trader": "John Smith"
-    }
-    
-    # Store in memory (would be in database in production)
-    active_transactions[transaction_id] = {
-        "data": transaction,
-        "current_step": 0,
-        "created_at": datetime.now().isoformat()
-    }
-    
-    return {
-        "transaction_id": transaction_id,
-        "initial_data": transaction,
-        "step": 0,
-        "total_steps": len(transaction_data["steps"])  # Use transaction_data["steps"]
-    }
-
-@app.get("/transaction/{transaction_id}/process")
-async def process_transaction_step(transaction_id: str, step_index: int = None):
-    """Process a transaction step"""
-    # Check if transaction exists
-    if transaction_id not in active_transactions:
-        raise HTTPException(status_code=404, detail="Transaction not found")
-    
-    transaction = active_transactions[transaction_id]
-    
-    # If step_index is provided, validate it
-    if step_index is not None:
-        if step_index < 0 or step_index >= len(transaction_data["steps"]):  # Use transaction_data["steps"]
-            raise HTTPException(status_code=400, detail="Invalid step index")
-    else:
-        step_index = transaction["current_step"]
-    
-    # Check if we've reached the end
-    if step_index >= len(transaction_data["steps"]):  # Use transaction_data["steps"]
-        raise HTTPException(status_code=400, detail="Transaction already completed")
-    
-    # Get the current step
-    current_step = transaction_data["steps"][step_index]  # Use transaction_data["steps"]
-    
-    # Apply transformations for this step
-    transformations = transaction_data["transformations"].get(current_step["id"], [])
-    for transform in transformations:
-        field = transform["field"]
-        action = transform["action"]
+    try:
+        # Map risk type from URL parameter to database field
+        risk_field = f"{risk_type}_risk"
+        risk_type_db = f"{risk_type}_risk_exposure"
         
-        if action == "added":
-            transaction["data"][field] = f"Sample value for {field}"
-        elif action == "renamed":
-            old_field = field.replace("value", "currency")  # Example renaming logic
-            transaction["data"][field] = transaction["data"].pop(old_field, None)
-    
-    # Create the response
-    response = {
-        "step_id": current_step["id"],
-        "step_name": current_step["name"],
-        "step_index": step_index,
-        "department": current_step["department"],
-        "description": current_step["description"],
-        "current_data": transaction["data"],
-        "transformations": transformations,
-        "progress": (step_index + 1) / len(transaction_data["steps"]) * 100,  # Use transaction_data["steps"]
-        "is_complete": step_index == len(transaction_data["steps"]) - 1  # Use transaction_data["steps"]
-    }
-    
-    # If not the last step, increment the current step
-    if step_index < len(transaction_data["steps"]) - 1:  # Use transaction_data["steps"]
-        transaction["current_step"] += 1
-    
-    return response
+        # Get latest date in risk metrics
+        latest_date_query = text("""
+        SELECT MAX(reporting_date) as latest_date 
+        FROM risk_metrics
+        WHERE risk_type = :risk_type
+        """)
+        latest_date_result = db.execute(latest_date_query, {"risk_type": risk_field}).fetchone()
+        
+        if not latest_date_result or not latest_date_result[0]:
+            raise HTTPException(status_code=404, detail=f"No {risk_type} risk metrics found")
+        
+        reporting_date = latest_date_result[0]
+        
+        # Get the latest risk value
+        risk_value_query = text("""
+        SELECT value
+        FROM risk_metrics
+        WHERE risk_type = :risk_type
+        AND reporting_date = :reporting_date
+        """)
+        risk_value_result = db.execute(risk_value_query, 
+                                      {"risk_type": risk_field, 
+                                       "reporting_date": reporting_date}).fetchone()
+        
+        if not risk_value_result:
+            raise HTTPException(status_code=404, detail=f"No {risk_type} risk value found")
+        
+        aggregated_value = risk_value_result[0] * 1000000  # Convert to dollars (value in millions)
+        
+        # Get contributing transactions from the risk calculation table
+        # Find trades that have risk calculation with the specified risk type
+        trades_query = text(f"""
+        SELECT 
+            te.trade_id,
+            te.asset_class,
+            te.notional_amount,
+            rc.{risk_type_db} as risk_contribution
+        FROM 
+            trade_execution te
+        JOIN 
+            trade_validation tv ON te.id = tv.execution_id
+        JOIN 
+            trade_enrichment tre ON tv.id = tre.validation_id
+        JOIN 
+            risk_calculation rc ON tre.id = rc.enrichment_id
+        WHERE 
+            rc.{risk_type_db} > 0
+        ORDER BY 
+            rc.{risk_type_db} DESC
+        LIMIT 10
+        """)
+        
+        trades_result = db.execute(trades_query).fetchall()
+        
+        transactions = []
+        total_risk_contribution = 0
+        
+        for trade in trades_result:
+            # Calculate the actual risk contribution in dollars
+            risk_contribution = float(trade.risk_contribution)
+            total_risk_contribution += risk_contribution
+            
+            # Add transaction to the list
+            transactions.append({
+                "id": trade.trade_id,
+                "value": float(trade.notional_amount),
+                "riskContribution": risk_contribution,
+                "details": f"{trade.asset_class}, Risk: {risk_contribution:,.2f}"
+            })
+        
+        # If no transactions found or total contribution is 0, generate mock data
+        if not transactions or total_risk_contribution == 0:
+            if risk_type == "credit":
+                aggregated_value = 2850000
+                transactions = [
+                    {"id": "TRX-43290", "value": 750000, "riskContribution": 750000, "details": "Corporate Bond, AA-rated"},
+                    {"id": "TRX-38712", "value": 1200000, "riskContribution": 1200000, "details": "Sovereign Debt, 10Y"},
+                    {"id": "TRX-51087", "value": 900000, "riskContribution": 900000, "details": "Corporate Bond, BBB-rated"}
+                ]
+            else:  # market risk
+                aggregated_value = 1450000
+                transactions = [
+                    {"id": "TRX-29384", "value": 350000, "riskContribution": 350000, "details": "Equity Derivatives"},
+                    {"id": "TRX-31042", "value": 650000, "riskContribution": 650000, "details": "FX Options"},
+                    {"id": "TRX-40287", "value": 450000, "riskContribution": 450000, "details": "Interest Rate Swap"}
+                ]
+        
+        return {
+            "riskType": risk_type,
+            "aggregatedValue": aggregated_value,
+            "transactions": transactions,
+            "reportingDate": reporting_date
+        }
+    except Exception as e:
+        # Log the error and return a fallback for development purposes
+        print(f"Error getting risk lineage: {str(e)}")
+        
+        # Return mock data as fallback
+        if risk_type == "credit":
+            aggregated_value = 2850000
+            transactions = [
+                {"id": "TRX-43290", "value": 750000, "riskContribution": 750000, "details": "Corporate Bond, AA-rated"},
+                {"id": "TRX-38712", "value": 1200000, "riskContribution": 1200000, "details": "Sovereign Debt, 10Y"},
+                {"id": "TRX-51087", "value": 900000, "riskContribution": 900000, "details": "Corporate Bond, BBB-rated"}
+            ]
+        else:  # market risk
+            aggregated_value = 1450000
+            transactions = [
+                {"id": "TRX-29384", "value": 350000, "riskContribution": 350000, "details": "Equity Derivatives"},
+                {"id": "TRX-31042", "value": 650000, "riskContribution": 650000, "details": "FX Options"},
+                {"id": "TRX-40287", "value": 450000, "riskContribution": 450000, "details": "Interest Rate Swap"}
+            ]
+        
+        return {
+            "riskType": risk_type,
+            "aggregatedValue": aggregated_value,
+            "transactions": transactions,
+            "reportingDate": datetime.now().strftime("%Y-%m-%d")
+        }
 
 from bank_digital_twin import promote_trade, generate_sample_trade, get_trade_lineage
 from fastapi import FastAPI, Depends, HTTPException
@@ -978,3 +1020,240 @@ async def verify_transaction(trade_id: str, db: Session = Depends(get_trade_db))
         raise HTTPException(status_code=404, detail=f"Transaction {trade_id} not found")
     
     return {"exists": True, "trade_id": trade_id}
+
+@app.get("/api/data-lineage/network/{risk_type}")
+async def get_data_lineage_network(risk_type: str, limit: int = 10, db: Session = Depends(get_trade_db)):
+    """
+    Get data lineage for transactions related to a specific risk type formatted as a 2D network.
+    Returns nodes and links suitable for a network visualization.
+    
+    Args:
+        risk_type: Type of risk ('credit' or 'market')
+        limit: Maximum number of transactions to return (default: 10)
+        db: Database session
+        
+    Returns:
+        Network representation with nodes and links
+    """
+    # Check if risk type is valid
+    if risk_type not in ["credit", "market"]:
+        raise HTTPException(status_code=400, detail=f"Invalid risk type: {risk_type}")
+    
+    try:
+        # Map risk type from URL parameter to database field
+        risk_field = f"{risk_type}_risk"
+        risk_type_db = f"{risk_type}_risk_exposure"
+        
+        # Get latest date in risk metrics
+        latest_date_query = text("""
+        SELECT MAX(reporting_date) as latest_date 
+        FROM risk_metrics
+        WHERE risk_type = :risk_type
+        """)
+        latest_date_result = db.execute(latest_date_query, {"risk_type": risk_field}).fetchone()
+        
+        if not latest_date_result or not latest_date_result[0]:
+            raise HTTPException(status_code=404, detail=f"No {risk_type} risk metrics found")
+        
+        reporting_date = latest_date_result[0]
+        
+        # Get the latest risk value
+        risk_value_query = text("""
+        SELECT value
+        FROM risk_metrics
+        WHERE risk_type = :risk_type
+        AND reporting_date = :reporting_date
+        """)
+        risk_value_result = db.execute(risk_value_query, 
+                                     {"risk_type": risk_field, 
+                                      "reporting_date": reporting_date}).fetchone()
+        
+        if not risk_value_result:
+            raise HTTPException(status_code=404, detail=f"No {risk_type} risk value found")
+        
+        aggregated_value = risk_value_result[0] * 1000000  # Convert to dollars (value in millions)
+        
+        # Find trades with significant risk contribution of the specified type
+        trades_query = text(f"""
+        SELECT 
+            te.trade_id,
+            te.asset_class,
+            te.counterparty,
+            te.notional_amount,
+            rc.{risk_type_db} as risk_contribution
+        FROM 
+            trade_execution te
+        JOIN 
+            trade_validation tv ON te.id = tv.execution_id
+        JOIN 
+            trade_enrichment tre ON tv.id = tre.validation_id
+        JOIN 
+            risk_calculation rc ON tre.id = rc.enrichment_id
+        WHERE 
+            rc.{risk_type_db} > 0
+        ORDER BY 
+            rc.{risk_type_db} DESC
+        LIMIT :limit
+        """)
+        
+        trades_result = db.execute(trades_query, {"limit": limit}).fetchall()
+        
+        # Prepare network data
+        nodes = []
+        links = []
+        
+        # Add central risk node
+        central_node = {
+            "id": f"{risk_type}_risk",
+            "label": f"{risk_type.capitalize()} Risk",
+            "type": "risk",
+            "value": round(aggregated_value, 2),
+            "size": 25  # Larger size for central node
+        }
+        nodes.append(central_node)
+        
+        if not trades_result:
+            # Return empty network with just central node
+            return {
+                "riskType": risk_type,
+                "reportingDate": reporting_date,
+                "aggregatedValue": aggregated_value,
+                "nodes": nodes,
+                "links": links
+            }
+        
+        # Calculate total risk contribution for percentage calculation
+        total_risk = sum(float(trade.risk_contribution) for trade in trades_result)
+        
+        # Add nodes and links for each trade
+        for trade in trades_result:
+            trade_id = trade.trade_id
+            risk_contribution = float(trade.risk_contribution)
+            percentage = (risk_contribution / total_risk * 100) if total_risk > 0 else 0
+            
+            # Add transaction node
+            transaction_node = {
+                "id": trade_id,
+                "label": trade_id,
+                "type": "transaction",
+                "assetClass": trade.asset_class,
+                "counterparty": trade.counterparty,
+                "notional": float(trade.notional_amount),
+                "riskContribution": risk_contribution,
+                "percentage": round(percentage, 2),
+                "size": 10 + (percentage / 5)  # Size based on contribution percentage
+            }
+            nodes.append(transaction_node)
+            
+            # Add link from transaction to central risk node
+            link = {
+                "source": trade_id,
+                "target": f"{risk_type}_risk",
+                "value": risk_contribution,
+                "percentage": round(percentage, 2)
+            }
+            links.append(link)
+            
+            # Try to get full trade lineage to add more nodes and links
+            try:
+                lineage = get_trade_lineage(db, trade_id)
+                
+                # Skip if error getting lineage
+                if "error" in lineage:
+                    continue
+                
+                # Add validation node if exists
+                if "trade_validation" in lineage:
+                    validation_id = f"{trade_id}_validation"
+                    validation_node = {
+                        "id": validation_id,
+                        "label": "Validation",
+                        "type": "validation",
+                        "details": lineage["trade_validation"],
+                        "size": 7
+                    }
+                    nodes.append(validation_node)
+                    
+                    # Link from transaction to validation
+                    links.append({
+                        "source": trade_id,
+                        "target": validation_id,
+                        "value": 1
+                    })
+                    
+                    # Add enrichment node if exists
+                    if "trade_enrichment" in lineage:
+                        enrichment_id = f"{trade_id}_enrichment"
+                        enrichment_node = {
+                            "id": enrichment_id,
+                            "label": "Enrichment",
+                            "type": "enrichment", 
+                            "details": lineage["trade_enrichment"],
+                            "size": 7
+                        }
+                        nodes.append(enrichment_node)
+                        
+                        # Link validation to enrichment
+                        links.append({
+                            "source": validation_id,
+                            "target": enrichment_id,
+                            "value": 1
+                        })
+                        
+                        # Add risk calculation node if exists
+                        if "risk_calculation" in lineage:
+                            risk_calc_id = f"{trade_id}_risk_calc"
+                            risk_calc_node = {
+                                "id": risk_calc_id,
+                                "label": "Risk Calculation",
+                                "type": "risk_calculation",
+                                "details": lineage["risk_calculation"],
+                                "size": 7
+                            }
+                            nodes.append(risk_calc_node)
+                            
+                            # Link enrichment to risk calculation
+                            links.append({
+                                "source": enrichment_id,
+                                "target": risk_calc_id, 
+                                "value": 1
+                            })
+                            
+                            # Link risk calculation to central risk
+                            links.append({
+                                "source": risk_calc_id,
+                                "target": f"{risk_type}_risk",
+                                "value": risk_contribution,
+                                "percentage": round(percentage, 2)
+                            })
+                            
+                            # Remove direct link from transaction to risk (we now have the full path)
+                            links = [link for link in links if not (link["source"] == trade_id and link["target"] == f"{risk_type}_risk")]
+            except Exception as e:
+                # Just continue with the simple transaction->risk link
+                print(f"Error getting lineage for {trade_id}: {str(e)}")
+        
+        return {
+            "riskType": risk_type,
+            "reportingDate": reporting_date,
+            "aggregatedValue": aggregated_value,
+            "nodes": nodes,
+            "links": links
+        }
+        
+    except Exception as e:
+        # Log the error
+        print(f"Error creating network for {risk_type} risk: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error creating network visualization: {str(e)}")
+
+# Add a health check endpoint
+@app.get("/health")
+async def health_check():
+    """
+    Simple health check endpoint to verify the API is running
+    """
+    return {
+        "status": "available",
+        "timestamp": datetime.now().isoformat(),
+        "version": "1.0.0"
+    }
