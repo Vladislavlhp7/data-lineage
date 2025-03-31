@@ -5,7 +5,7 @@ import './TransactionLineage.css';
 
 function TransactionLineage() {
   const [transactionId, setTransactionId] = useState(null);
-  const [currentStep, setCurrentStep] = useState(0);
+  const [currentStep, setCurrentStep] = useState(-1);
   const [steps, setSteps] = useState([]);
   const [transactionData, setTransactionData] = useState(null);
   const [transformations, setTransformations] = useState([]);
@@ -118,6 +118,9 @@ function TransactionLineage() {
         e.target.tagName === 'BUTTON') {
       return;
     }
+    // Prevent default browser behavior (text selection)
+    e.preventDefault();
+    
     setIsDragging(true);
     setStartPosition({
       x: e.clientX - dragPosition.x,
@@ -126,30 +129,35 @@ function TransactionLineage() {
   };
   
   const handleMouseMove = (e) => {
-    if (isDragging) {
-      const newX = e.clientX - startPosition.x;
-      const newY = e.clientY - startPosition.y;
+    if (isDragging || isDraggingPanel) {
+      // Prevent default browser behavior (text selection)
+      e.preventDefault();
       
-      setDragPosition({ x: newX, y: newY });
-    } else if (isDraggingPanel) {
-      const newX = e.clientX - panelStartPosition.x;
-      const newY = e.clientY - panelStartPosition.y;
-      
-      // Add boundaries to keep the panel within the viewport
-      const panel = dataPanelRef.current;
-      const panelWidth = panel ? panel.offsetWidth : 350;
-      const panelHeight = panel ? panel.offsetHeight : 500;
-      
-      // Calculate boundary limits
-      const maxX = window.innerWidth - 50; // Keep at least 50px visible on right
-      const minX = -panelWidth + 50; // Keep at least 50px visible on left
-      const maxY = window.innerHeight - 50; // Keep at least 50px visible on bottom
-      const minY = 50; // Keep at least 50px visible on top (below header)
-      
-      const boundedX = Math.min(Math.max(newX, minX), maxX);
-      const boundedY = Math.min(Math.max(newY, minY), maxY);
-      
-      setDataPanelPosition({ x: boundedX, y: boundedY });
+      if (isDragging) {
+        const newX = e.clientX - startPosition.x;
+        const newY = e.clientY - startPosition.y;
+        
+        setDragPosition({ x: newX, y: newY });
+      } else if (isDraggingPanel) {
+        const newX = e.clientX - panelStartPosition.x;
+        const newY = e.clientY - panelStartPosition.y;
+        
+        // Add boundaries to keep the panel within the viewport
+        const panel = dataPanelRef.current;
+        const panelWidth = panel ? panel.offsetWidth : 350;
+        const panelHeight = panel ? panel.offsetHeight : 500;
+        
+        // Calculate boundary limits
+        const maxX = window.innerWidth - 50; // Keep at least 50px visible on right
+        const minX = -panelWidth + 50; // Keep at least 50px visible on left
+        const maxY = window.innerHeight - 50; // Keep at least 50px visible on bottom
+        const minY = 50; // Keep at least 50px visible on top (below header)
+        
+        const boundedX = Math.min(Math.max(newX, minX), maxX);
+        const boundedY = Math.min(Math.max(newY, minY), maxY);
+        
+        setDataPanelPosition({ x: boundedX, y: boundedY });
+      }
     }
   };
   
@@ -223,12 +231,13 @@ function TransactionLineage() {
   // Function to create a new transaction
   const createTransaction = async () => {
     setLoading(true);
+    
     try {
       const response = await axios.post('http://localhost:8000/api/transaction/create');
       const tradeExecutionData = response.data.initial_data.trade_execution; // Extract nested data
       setTransactionId(response.data.trade_id);
       setTransactionData(response.data.initial_data); // Populate the entire transaction data
-      setCurrentStep(0); // Reset currentStep to 0 for the new transaction
+      setCurrentStep(0); // Update to first step immediately
       setTransformations([]); // Clear transformations
       
       // Store risk impact data
@@ -246,13 +255,14 @@ function TransactionLineage() {
     }
   };
 
-  // Function to promote the transaction to the next stage
+  // Update the promoteTransaction function to use only processingAnimation
   const promoteTransaction = async () => {
     if (!transactionId) {
       alert('No transaction found. Please start a transaction first.');
       return;
     }
     setProcessingAnimation(true); // Start the animation
+    
     try {
       const response = await axios.post(`http://localhost:8000/api/transaction/promote/${transactionId}`);
       const updatedData = response.data.updated_data;
@@ -272,11 +282,17 @@ function TransactionLineage() {
         setRiskImpact(response.data.risk_impact);
       }
 
-      // Mark the current step as completed and move to the next step
+      // Wait for the animation to complete before updating the step
+      // Animation takes exactly 1 second to reach the end position
       setTimeout(() => {
+        // Update current step
         setCurrentStep((prevStep) => prevStep + 1);
-        setProcessingAnimation(false); // Stop the animation
-      }, 1000); // Match the animation duration
+        
+        // Let the ball remain at the end position for a moment, then turn off animation
+        setTimeout(() => {
+          setProcessingAnimation(false); // Stop the animation
+        }, 500); // Slightly longer delay to ensure ball stays visible at final position
+      }, 1000);
     } catch (error) {
       console.error('Error promoting transaction:', error);
       alert('Failed to promote transaction. Please try again.');
@@ -413,36 +429,43 @@ function TransactionLineage() {
 
   // Ensure proper rendering of transaction steps
   const renderTransactionSteps = () => {
-    return steps.map((step, index) => (
-      <React.Fragment key={step.id}>
-        <div
-          className={`flow-node ${index === currentStep ? 'active' : ''} ${index < currentStep ? 'completed' : ''}`}
-          title={step.description}
-        >
-          <div className="node-content">
-            <div className="node-icon">
-              {index < currentStep ? (
-                <i className="fas fa-check"></i>
-              ) : (
-                <span className="step-number">{index + 1}</span>
-              )}
+    return (
+      <>
+        {steps.map((step, index) => (
+          <React.Fragment key={step.id}>
+            <div
+              className={`flow-node ${index === currentStep ? 'active' : ''} ${index < currentStep ? 'completed' : ''}`}
+              title={step.description}
+            >
+              <div className="node-content">
+                <div className="node-icon">
+                  {index < currentStep ? (
+                    <i className="fas fa-check"></i>
+                  ) : (
+                    <span className="step-number">{index + 1}</span>
+                  )}
+                </div>
+                <div className="node-label">
+                  <div className="step-name">{step.name}</div>
+                  <div className="department">{step.department}</div>
+                </div>
+              </div>
             </div>
-            <div className="node-label">
-              <div className="step-name">{step.name}</div>
-              <div className="department">{step.department}</div>
-            </div>
-          </div>
-        </div>
-        {index < steps.length - 1 && (
-          <div className={`flow-connector ${index < currentStep ? 'completed' : ''}`}>
-            <div className="connector-line"></div>
-            {processingAnimation && index === currentStep && (
-              <div className="moving-point"></div> // Add the moving point
+            
+            {index < steps.length - 1 && (
+              <div className={`flow-connector ${index < currentStep ? 'completed' : ''}`}>
+                <div className="connector-line"></div>
+                
+                {/* Animation for moving between nodes */}
+                {processingAnimation && index === currentStep && (
+                  <div className="moving-point"></div>
+                )}
+              </div>
             )}
-          </div>
-        )}
-      </React.Fragment>
-    ));
+          </React.Fragment>
+        ))}
+      </>
+    );
   };
 
   // Render transformations in the data panel

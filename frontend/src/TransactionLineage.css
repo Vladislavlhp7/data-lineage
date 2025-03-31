@@ -18,16 +18,6 @@
 
 /* Playground Area */
 .lineage-playground {
-  width: 100%;
-  height: 100%;
-  position: absolute;
-  top: 0;
-  left: 0;
-  overflow: hidden;
-}
-
-/* Playground Area */
-.lineage-playground {
   width: 100vw;
   height: 100vh;
   position: absolute;
@@ -37,6 +27,11 @@
   scroll-behavior: smooth; /* Enable smooth scrolling */
   overflow: auto; /* Allow scrolling in all directions */
   overscroll-behavior: none; /* Prevent scroll chaining to the playground */
+  cursor: grab; /* Show grab cursor to indicate the area is draggable */
+}
+
+.lineage-playground:active {
+  cursor: grabbing; /* Change to grabbing when actively dragging */
 }
 
 /* Fixed Header */
@@ -300,6 +295,7 @@
   background-color: rgba(255, 255, 255, 0.9);
   border-radius: 10px;
   box-shadow: 0 2px 15px rgba(0,0,0,0.1);
+  user-select: none; /* Prevent text selection during dragging */
 }
 
 /* Visualization content */
@@ -317,6 +313,7 @@
   min-width: 100%;
   min-height: 100%;
   transition: transform 0.2s ease;
+  user-select: none; /* Prevent text selection during dragging */
 }
 
 /* Lineage section and flow section */
@@ -607,17 +604,24 @@
 }
 
 .flow-connector {
+  display: flex;
+  align-items: center;
   flex: 1;
-  height: 2px;
-  background-color: #ddd;
   position: relative;
   margin: 0 10px;
   min-width: 50px;
   z-index: 1;
+  overflow: visible; /* Change from hidden to visible to show the ball */
 }
 
-.flow-connector.completed {
-  background-color: #2ecc71;
+.connector-line {
+  height: 2px;
+  background-color: #ddd;
+  width: 100%;
+}
+
+.flow-connector.completed .connector-line {
+  background-color: #4CAF50;
 }
 
 .flow-connector.processing .connector-line {
@@ -933,6 +937,7 @@
   overflow-x: visible;
   min-height: 300px;
   display: flex;
+  user-select: none; /* Prevent text selection during dragging */
 }
 
 .lineage-node {
@@ -1624,4 +1629,58 @@
   font-weight: 600;
   font-size: 14px;
   box-shadow: 0 4px 12px rgba(52, 152, 219, 0.3);
+}
+
+/* Moving Point Animation */
+.moving-point {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #27ae60, #2ecc71);
+  position: absolute;
+  top: -6px;
+  left: 0;
+  animation: movePointAcross 1s linear forwards;
+  box-shadow: 0 0 10px rgba(46, 204, 113, 0.7);
+}
+
+@keyframes movePointAcross {
+  0% {
+    left: 0;
+    transform: translateX(0);
+    box-shadow: 0 0 8px rgba(46, 204, 113, 0.7);
+  }
+  100% {
+    left: 100%;
+    transform: translateX(-100%);
+    box-shadow: 0 0 8px rgba(46, 204, 113, 0.7);
+  }
+}
+
+/* Initial Connector Animation */
+.initial-connector {
+  position: absolute;
+  left: -60px;
+  top: 50px;
+  width: 60px;
+  height: 2px;
+  background-color: #ddd;
+}
+
+.initial-connector .moving-point {
+  animation: moveFromLeft 1s linear forwards;
+}
+
+@keyframes moveFromLeft {
+  0% {
+    left: 0;
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  100% {
+    left: 60px;
+    opacity: 1;
+  }
 }
