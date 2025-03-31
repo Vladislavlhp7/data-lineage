@@ -128,6 +128,14 @@ function Home() {
                         <i className="fas fa-chart-network"></i> Launch Demo
                     </Link>
                 </div>
+                
+                <div className="demo-card">
+                    <h2>BCBS 239 Report</h2>
+                    <p>Generate and view regulatory reporting based on BCBS 239 standards</p>
+                    <Link to="/bcbs-report" className="demo-btn">
+                        <i className="fas fa-file-contract"></i> View Reports
+                    </Link>
+                </div>
             </div>
             
             {uploading && (

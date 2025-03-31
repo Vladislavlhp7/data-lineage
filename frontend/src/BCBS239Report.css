@@ -1,0 +1,296 @@
+.bcbs-report-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.bcbs-report-container h1 {
+    color: #2c3e50;
+    text-align: center;
+    margin-bottom: 10px;
+    font-size: 28px;
+}
+
+.report-date {
+    text-align: center;
+    color: #7f8c8d;
+    margin-bottom: 30px;
+    font-size: 14px;
+}
+
+.report-summary {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 40px;
+}
+
+.summary-box {
+    background-color: white;
+    border-radius: 8px;
+    padding: 20px;
+    width: 48%;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+}
+
+.summary-box h3 {
+    color: #2c3e50;
+    margin-top: 0;
+    margin-bottom: 15px;
+    font-size: 18px;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 10px;
+}
+
+.ratio-value {
+    font-size: 36px;
+    font-weight: bold;
+    color: #2980b9;
+    text-align: center;
+    margin: 20px 0;
+}
+
+.status-indicator {
+    text-align: center;
+    padding: 5px 10px;
+    border-radius: 15px;
+    display: inline-block;
+    font-weight: bold;
+    margin: 0 auto;
+    display: block;
+    width: fit-content;
+}
+
+.status-indicator.compliant {
+    background-color: #27ae60;
+    color: white;
+}
+
+.status-indicator.warning {
+    background-color: #f39c12;
+    color: white;
+}
+
+.status-indicator.non-compliant {
+    background-color: #e74c3c;
+    color: white;
+}
+
+.risk-chart {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-around;
+    height: 150px;
+    margin-top: 20px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #ddd;
+}
+
+.risk-bar {
+    width: 30px;
+    min-height: 5px;
+    border-radius: 3px 3px 0 0;
+    transition: height 0.3s ease;
+    cursor: pointer;
+}
+
+.risk-bar:hover {
+    opacity: 0.8;
+    transform: scaleY(1.05);
+    transform-origin: bottom;
+}
+
+.risk-metrics-table {
+    background-color: white;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 40px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+}
+
+.risk-metrics-table h2 {
+    color: #2c3e50;
+    margin-top: 0;
+    font-size: 22px;
+    margin-bottom: 20px;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+th, td {
+    padding: 12px 15px;
+    text-align: left;
+    border-bottom: 1px solid #eee;
+}
+
+th {
+    background-color: #f8f9fa;
+    color: #2c3e50;
+    font-weight: 600;
+}
+
+.risk-value {
+    font-weight: bold;
+    cursor: pointer;
+    position: relative;
+}
+
+.hover-effect {
+    transition: all 0.2s ease;
+}
+
+.hover-effect:hover {
+    background-color: #f0f8ff;
+    color: #2980b9;
+    text-decoration: underline;
+}
+
+.trend-cell {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.trend-up {
+    color: #e74c3c;
+}
+
+.trend-down {
+    color: #27ae60;
+}
+
+.trend-stable {
+    color: #f39c12;
+}
+
+.view-details-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 10px;
+    background-color: #3498db;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    text-decoration: none;
+    transition: background-color 0.2s;
+}
+
+.view-details-btn:hover {
+    background-color: #2980b9;
+}
+
+.risk-tooltip {
+    position: fixed;
+    background-color: white;
+    border-radius: 6px;
+    padding: 15px;
+    box-shadow: 0 3px 15px rgba(0, 0, 0, 0.2);
+    z-index: 1000;
+    max-width: 300px;
+    border-left: 4px solid #3498db;
+    pointer-events: none;
+}
+
+.risk-tooltip h4 {
+    margin-top: 0;
+    margin-bottom: 5px;
+    color: #2c3e50;
+}
+
+.risk-tooltip p {
+    margin-bottom: 10px;
+    font-size: 14px;
+    color: #7f8c8d;
+}
+
+.tooltip-sources {
+    font-size: 13px;
+    border-top: 1px solid #eee;
+    padding-top: 10px;
+}
+
+.tooltip-sources ul {
+    margin-top: 5px;
+    padding-left: 20px;
+}
+
+.tooltip-sources li {
+    margin-bottom: 3px;
+}
+
+.report-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 20px;
+}
+
+.disclaimer {
+    flex: 2;
+    background-color: #fff8e1;
+    padding: 15px;
+    border-radius: 6px;
+    border-left: 4px solid #ffa000;
+}
+
+.disclaimer h3 {
+    margin-top: 0;
+    color: #f39c12;
+    font-size: 16px;
+}
+
+.disclaimer p {
+    margin-bottom: 0;
+    font-size: 14px;
+    color: #7f8c8d;
+}
+
+.report-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    flex: 1;
+}
+
+.report-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px 15px;
+    background-color: #2c3e50;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background-color 0.2s;
+}
+
+.report-btn:hover {
+    background-color: #1a252f;
+}
+
+@media (max-width: 768px) {
+    .report-summary {
+        flex-direction: column;
+    }
+    
+    .summary-box {
+        width: 100%;
+        margin-bottom: 20px;
+    }
+    
+    .report-footer {
+        flex-direction: column;
+    }
+} 
