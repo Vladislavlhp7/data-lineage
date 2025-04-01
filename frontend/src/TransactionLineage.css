@@ -1,0 +1,1686 @@
+.transaction-lineage {
+  width: 100%;
+  height: 100vh;
+  position: relative;
+  overflow: hidden;
+  background-color: #f5f7fa;
+}
+
+/* Full width transaction lineage */
+.transaction-lineage.full-width {
+  width: 100vw;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* Playground Area */
+.lineage-playground {
+  width: 100vw;
+  height: 100vh;
+  position: absolute;
+  top: 0;
+  left: 0;
+  overflow: hidden;
+  scroll-behavior: smooth; /* Enable smooth scrolling */
+  overflow: auto; /* Allow scrolling in all directions */
+  overscroll-behavior: none; /* Prevent scroll chaining to the playground */
+  cursor: grab; /* Show grab cursor to indicate the area is draggable */
+}
+
+.lineage-playground:active {
+  cursor: grabbing; /* Change to grabbing when actively dragging */
+}
+
+/* Fixed Header */
+.fixed-header {
+  position: fixed;
+  top: 4.5rem; /* Adjusted to ensure it is below the main app banner */
+  left: 0;
+  width: 100%;
+  z-index: 100;
+  background-color: white;
+  padding: 0.5rem 1rem; /* Reduced padding for less height */
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.fixed-header .header-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.fixed-header .header-controls {
+  display: flex;
+  gap: 1rem;
+}
+
+.header-actions h1 {
+  font-size: 1.2rem; /* Reduced font size */
+  margin: 0;
+}
+
+.header-controls {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.header-controls.horizontal-buttons {
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-start;
+  align-items: center;
+}
+
+/* Header actions */
+.header-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: white;
+  padding: 1rem;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+  border-radius: 0 0 8px 8px;
+}
+
+.header-controls {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.back-link {
+  color: #2c3e50;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  font-weight: 500;
+}
+
+.back-link i {
+  margin-right: 0.5rem;
+}
+
+.reset-btn {
+  background-color: #ecf0f1;
+  color: #2c3e50;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  font-size: 1rem;
+}
+
+.reset-btn i {
+  margin-right: 0.5rem;
+}
+
+/* Transaction ID */
+.transaction-id {
+  background-color: rgba(255, 255, 255, 0.9);
+  padding: 0.5rem 1rem;
+  display: flex;
+  align-items: center;
+  margin: 0;
+  font-size: 0.8rem; /* Reduced font size */
+  box-shadow: 0 1px 5px rgba(0,0,0,0.05);
+  border-radius: 0 0 8px 8px;
+}
+
+.transaction-id .label {
+  font-weight: 600;
+  color: #6c757d;
+  margin-right: 0.5rem;
+}
+
+.transaction-id .value {
+  color: #495057;
+  font-family: monospace;
+  padding: 0.2rem 0.4rem;
+  background-color: #e9ecef;
+  border-radius: 3px;
+}
+
+.current-step-chip {
+  margin-left: auto;
+  background-color: #3498db;
+  color: white;
+  border-radius: 20px;
+  padding: 0.25rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-size: 0.8rem;
+}
+
+.step-name {
+  font-weight: 600;
+}
+
+.step-department {
+  font-size: 0.7rem;
+  opacity: 0.9;
+}
+
+/* Floating Data Panel */
+.floating-data-panel {
+  position: absolute;
+  background-color: white;
+  border-radius: 10px;
+  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
+  z-index: 1000;
+  overflow: hidden;
+  transition: width 0.3s ease, height 0.3s ease;
+  resize: none;
+  display: flex;
+  flex-direction: column;
+  max-height: 80vh;
+  width: 350px;
+  border: 1px solid #e0e0e0;
+}
+
+.floating-data-panel .panel-header {
+  display: flex;
+  align-items: center;
+  padding: 12px 15px;
+  background: linear-gradient(to right, #f8f9fa, #ffffff);
+  border-bottom: 1px solid #e0e0e0;
+  cursor: move;
+  user-select: none;
+}
+
+.floating-data-panel .panel-header h3 {
+  margin: 0;
+  font-size: 16px;
+  flex-grow: 1;
+  color: #333;
+}
+
+.floating-data-panel .panel-controls {
+  display: flex;
+  gap: 8px;
+}
+
+.floating-data-panel .panel-body {
+  padding: 15px;
+  overflow-y: auto;
+  flex-grow: 1;
+  max-height: calc(80vh - 50px);
+  overscroll-behavior: contain; /* Prevent overscroll effects from propagating */
+}
+
+.floating-data-panel .drag-handle {
+  margin-right: 10px;
+  color: #999;
+  cursor: move;
+}
+
+.floating-data-panel .minimize-btn {
+  background: none;
+  border: none;
+  color: #666;
+  cursor: pointer;
+  padding: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+}
+
+.floating-data-panel .minimize-btn:hover {
+  background-color: #f0f0f0;
+  color: #333;
+}
+
+/* Transaction data table styling */
+.transaction-table {
+  width: 100%;
+  overflow-x: hidden;
+}
+
+.transaction-section {
+  margin-bottom: 20px;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid #e6e6e6;
+}
+
+.transaction-section h4 {
+  margin: 0;
+  padding: 10px 15px;
+  background-color: #f8f9fa;
+  font-size: 14px;
+  font-weight: 600;
+  color: #495057;
+  border-bottom: 1px solid #e6e6e6;
+}
+
+.transaction-section table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.transaction-section td {
+  padding: 8px 15px;
+  border-bottom: 1px solid #f2f2f2;
+}
+
+.transaction-section tr:last-child td {
+  border-bottom: none;
+}
+
+.transaction-section td:first-child {
+  font-weight: 500;
+  color: #666;
+  width: 40%;
+}
+
+.transaction-section td:last-child {
+  color: #333;
+  word-break: break-word;
+}
+
+/* Transaction flow visualization */
+.transaction-flow {
+  display: flex;
+  align-items: center;
+  margin: 2rem 0;
+  padding: 1.5rem;
+  background-color: rgba(255, 255, 255, 0.9);
+  border-radius: 10px;
+  box-shadow: 0 2px 15px rgba(0,0,0,0.1);
+  user-select: none; /* Prevent text selection during dragging */
+}
+
+/* Visualization content */
+.visualization-content {
+  padding: 6rem 2rem 2rem;
+  min-width: 100%;
+  min-height: 120vh; /* Increased height for data lineage */
+  transition: transform 0.1s ease;
+  transform: translate(0, 0) scale(1); /* Ensure reset sets to default position and scale */
+}
+
+/* Visualization Content with Scale Transition */
+.visualization-content {
+  padding: 6rem 2rem 2rem;
+  min-width: 100%;
+  min-height: 100%;
+  transition: transform 0.2s ease;
+  user-select: none; /* Prevent text selection during dragging */
+}
+
+/* Lineage section and flow section */
+.flow-section {
+  margin-bottom: 4rem;
+}
+
+.lineage-section {
+  margin-top: 2rem;
+}
+
+/* Section labels */
+.section-label {
+  font-size: 1.2rem;
+  font-weight: 500;
+  color: #2c3e50;
+  margin-bottom: 1rem;
+  background-color: rgba(255, 255, 255, 0.8);
+  padding: 0.5rem 1rem;
+  border-radius: 5px;
+  display: inline-block;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+/* Help tips */
+.help-tips {
+  position: fixed;
+  bottom: 1rem;
+  left: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  z-index: 80;
+}
+
+/* Help tips - repositioned */
+.help-tips {
+  position: fixed;
+  bottom: 4rem; /* Position above zoom controls */
+  left: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  z-index: 80;
+}
+
+.tip {
+  background-color: rgba(0, 0, 0, 0.7);
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 5px;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+}
+
+.tip i {
+  margin-right: 0.5rem;
+}
+
+/* Reset position button */
+.reset-position-btn {
+  position: fixed;
+  bottom: 1rem;
+  right: 1rem;
+  background-color: rgba(255, 255, 255, 0.9);
+  border: 1px solid #ddd;
+  padding: 0.5rem 1rem;
+  border-radius: 5px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  z-index: 50;
+  transition: background-color 0.2s;
+}
+
+.reset-position-btn:hover {
+  background-color: white;
+}
+
+.reset-position-btn i {
+  margin-right: 0.5rem;
+  color: #3498db;
+}
+
+/* Process next step button */
+.next-step-btn {
+  background-color: #3498db;
+  color: white;
+  border: none;
+  padding: 0.7rem 1.5rem;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: background-color 0.2s;
+}
+
+.next-step-btn:hover:not(:disabled) {
+  background-color: #2980b9;
+}
+
+.next-step-btn:disabled {
+  background-color: #bdc3c7;
+  cursor: not-allowed;
+}
+
+/* Completion message */
+.completion-message {
+  position: fixed;
+  bottom: 2rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: #2ecc71;
+  color: white;
+  padding: 1rem 2rem;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+  z-index: 100;
+}
+
+.completion-badge {
+  display: inline-flex;
+  align-items: center;
+  background-color: #2ecc71;
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 5px;
+  font-weight: 500;
+}
+
+.completion-badge i {
+  margin-right: 0.5rem;
+}
+
+.restart-btn {
+  background-color: white;
+  color: #2ecc71;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  margin-left: 1rem;
+  cursor: pointer;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+}
+
+.restart-btn i {
+  margin-right: 0.5rem;
+}
+
+.transaction-lineage {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+}
+
+/* Header and navigation */
+.header-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background-color: white;
+  padding: 1rem;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+  border-radius: 8px;
+}
+
+.header-controls {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.back-link {
+  color: #2c3e50;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  font-weight: 500;
+}
+
+.back-link i {
+  margin-right: 0.5rem;
+}
+
+.reset-btn {
+  background-color: #ecf0f1;
+  color: #2c3e50;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  font-size: 1rem;
+}
+
+.reset-btn i {
+  margin-right: 0.5rem;
+}
+
+/* Transaction flow visualization */
+.transaction-flow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 2rem 0;
+  overflow-x: auto;
+  padding: 1rem 0;
+  background-color: rgba(255, 255, 255, 0.9);
+  padding: 1.5rem;
+  border-radius: 10px;
+  box-shadow: 0 2px 15px rgba(0,0,0,0.1);
+}
+
+.flow-node {
+  min-width: 150px;
+  position: relative;
+  z-index: 2;
+}
+
+.node-content {
+  background-color: white;
+  border: 2px solid #ddd;
+  border-radius: 8px;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transition: all 0.3s ease;
+}
+
+.flow-node.active .node-content {
+  border-color: #3498db;
+  box-shadow: 0 0 15px rgba(52, 152, 219, 0.4);
+}
+
+.flow-node.completed .node-content {
+  border-color: #2ecc71;
+}
+
+.node-icon {
+  width: 36px;
+  height: 36px;
+  background-color: #ecf0f1;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 0.5rem;
+  font-weight: bold;
+}
+
+.flow-node.active .node-icon {
+  background-color: #3498db;
+  color: white;
+}
+
+.flow-node.completed .node-icon {
+  background-color: #2ecc71;
+  color: white;
+}
+
+.node-label {
+  text-align: center;
+}
+
+.step-name {
+  font-weight: 500;
+  color: #2c3e50;
+  margin-bottom: 0.25rem;
+}
+
+.department {
+  font-size: 0.75rem;
+  color: #7f8c8d;
+}
+
+.flow-connector {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  position: relative;
+  margin: 0 10px;
+  min-width: 50px;
+  z-index: 1;
+  overflow: visible; /* Change from hidden to visible to show the ball */
+}
+
+.connector-line {
+  height: 2px;
+  background-color: #ddd;
+  width: 100%;
+}
+
+.flow-connector.completed .connector-line {
+  background-color: #4CAF50;
+}
+
+.flow-connector.processing .connector-line {
+  background: linear-gradient(90deg, #2ecc71 50%, #ddd 50%);
+  background-size: 20px 2px;
+  animation: movingLine 1s linear infinite;
+  height: 100%;
+}
+
+@keyframes movingLine {
+  from { background-position: 0 0; }
+  to { background-position: 20px 0; }
+}
+
+.processing-animation {
+  position: absolute;
+  top: -7px;
+  left: 0;
+  width: 100%;
+  color: #3498db;
+  animation: moveCircle 2s linear infinite;
+}
+
+@keyframes moveCircle {
+  from { left: 0; }
+  to { left: calc(100% - 16px); }
+}
+
+/* Current step information */
+.current-step-info {
+  background-color: white;
+  border-radius: 8px;
+  padding: 1.5rem;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+  margin-bottom: 2rem;
+  position: relative;
+}
+
+.department-badge {
+  display: inline-block;
+  background-color: #3498db;
+  color: white;
+  padding: 0.25rem 0.75rem;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  position: absolute;
+  top: 1.5rem;
+  right: 1.5rem;
+}
+
+.step-description {
+  color: #7f8c8d;
+  margin-top: 1rem;
+}
+
+/* Data transformation */
+.data-transformation {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 2rem;
+  margin-bottom: 2rem;
+}
+
+@media (min-width: 992px) {
+  .data-transformation {
+    grid-template-columns: 2fr 1fr;
+  }
+}
+
+.data-panel-container {
+  position: sticky;
+  top: 140px;
+  z-index: 80;
+  margin-bottom: 1rem;
+}
+
+.data-panel {
+  background-color: white;
+  border-radius: 8px;
+  padding: 1rem;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+  max-height: 300px;
+}
+
+.data-table {
+  max-height: 200px;
+}
+
+.data-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.data-table th {
+  background-color: #f8f9fa;
+  padding: 0.75rem;
+  text-align: left;
+  border-bottom: 2px solid #ddd;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.data-table td {
+  padding: 0.75rem;
+  border-bottom: 1px solid #eee;
+}
+
+.data-table tr.highlight-row {
+  background-color: rgba(52, 152, 219, 0.1);
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.status-badge.new {
+  background-color: rgba(46, 204, 113, 0.15);
+  color: #27ae60;
+}
+
+/* Transformations */
+.transformations {
+  display: none;
+}
+
+.transformation-list {
+  list-style-type: none;
+  padding: 0;
+  margin: 0;
+}
+
+.transformation-item {
+  padding: 0.75rem 0;
+  border-bottom: 1px solid #eee;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.5rem 1rem;
+}
+
+.transform-type {
+  grid-column: 1;
+  grid-row: 1;
+  background-color: #f8f9fa;
+  color: #2c3e50;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.transform-type.added {
+  background-color: rgba(46, 204, 113, 0.15);
+  color: #27ae60;
+}
+
+.transform-type.renamed {
+  background-color: rgba(52, 152, 219, 0.15);
+  color: #2980b9;
+}
+
+.transform-type.modified {
+  background-color: rgba(241, 196, 15, 0.15);
+  color: #f39c12;
+}
+
+.transform-field {
+  grid-column: 2;
+  grid-row: 1;
+  font-weight: 500;
+}
+
+.transform-description {
+  grid-column: 1 / span 2;
+  grid-row: 2;
+  color: #7f8c8d;
+  font-size: 0.9rem;
+}
+
+/* Action area */
+.action-area {
+  margin: 2rem 0;
+  display: flex;
+  justify-content: center;
+}
+
+.next-step-btn {
+  background-color: #3498db;
+  color: white;
+  border: none;
+  padding: 1rem 2rem;
+  border-radius: 8px;
+  font-size: 1.1rem;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  transition: background-color 0.2s;
+}
+
+.next-step-btn:hover:not(:disabled) {
+  background-color: #2980b9;
+}
+
+.next-step-btn:disabled {
+  background-color: #bdc3c7;
+  cursor: not-allowed;
+}
+
+.completion-message {
+  background-color: #2ecc71;
+  color: white;
+  padding: 1rem 2rem;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.restart-btn {
+  background-color: white;
+  color: #2ecc71;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  margin-left: 1rem;
+  cursor: pointer;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+}
+
+.restart-btn i {
+  margin-right: 0.5rem;
+}
+
+/* Data lineage graph */
+.data-lineage-graph {
+  margin: 2rem 0;
+  background-color: white;
+  border-radius: 8px;
+  padding: 1.5rem;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+  overflow: hidden;
+}
+
+.graph-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+  padding: 0.75rem;
+  background-color: #f8f9fa;
+  border-radius: 5px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.legend-color {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+}
+
+.legend-color.data-source {
+  background-color: #e74c3c;
+}
+
+.legend-color.process {
+  background-color: #3498db;
+}
+
+.legend-color.data-field {
+  background-color: #2ecc71;
+}
+
+.legend-color.target {
+  background-color: #9b59b6;
+}
+
+/* Lineage graph */
+.graph-visualization {
+  width: 100%;
+  overflow-x: auto;
+  padding: 1rem 0;
+}
+
+.lineage-graph {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 500px;
+  padding: 1.5rem;
+  position: relative;
+  width: 100%;
+  background-color: rgba(255, 255, 255, 0.9);
+  padding: 1.5rem;
+  border-radius: 10px;
+  box-shadow: 0 2px 15px rgba(0,0,0,0.1);
+  flex-direction: row !important;
+  align-items: flex-start;
+  justify-content: flex-start;
+  overflow-x: visible;
+  min-height: 300px;
+  display: flex;
+  user-select: none; /* Prevent text selection during dragging */
+}
+
+.lineage-node {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 160px;
+  min-height: 70px;
+  padding: 1rem;
+  border-radius: 8px;
+  position: relative;
+  margin: 0.5rem 0;
+  opacity: 0.6;
+  transition: all 0.3s ease;
+}
+
+.lineage-node.active {
+  opacity: 1;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+}
+
+.lineage-node .node-icon {
+  margin-bottom: 0.5rem;
+  font-size: 1.5rem;
+}
+
+.lineage-node .node-text {
+  font-weight: 500;
+  text-align: center;
+  font-size: 0.9rem;
+}
+
+/* Node types */
+.lineage-node.source {
+  background-color: rgba(231, 76, 60, 0.15);
+  border: 2px solid #e74c3c;
+}
+
+.lineage-node.source .node-icon {
+  color: #e74c3c;
+}
+
+.lineage-node.process {
+  background-color: rgba(52, 152, 219, 0.15);
+  border: 2px solid #3498db;
+}
+
+.lineage-node.process .node-icon {
+  color: #3498db;
+}
+
+.lineage-node.data-field {
+  background-color: rgba(46, 204, 113, 0.15);
+  border: 2px solid #2ecc71;
+}
+
+.lineage-node.data-field .node-icon {
+  color: #2ecc71;
+}
+
+.lineage-node.target {
+  background-color: rgba(155, 89, 182, 0.15);
+  border: 2px solid #9b59b6;
+}
+
+.lineage-node.target .node-icon {
+  color: #9b59b6;
+}
+
+/* Side input node */
+.lineage-node.side-input {
+  position: absolute;
+  right: 10%;
+  transform: translateX(50%);
+  top: -70px;
+  right: auto;
+  left: 50%;
+  transform: none;
+}
+
+.side-connector {
+  position: absolute;
+  left: -50px;
+  top: 50%;
+  width: 50px;
+  height: 2px;
+  background-color: #e74c3c;
+  left: 50%;
+  top: 100%;
+  width: 2px;
+  height: 50px;
+}
+
+/* Connectors */
+.lineage-connector {
+  width: 2px;
+  height: 30px;
+  background-color: #95a5a6;
+  position: relative;
+  width: 50px;
+  height: 2px;
+  min-width: 20px;
+  background-color: #95a5a6;
+}
+
+.lineage-node.active + .lineage-connector,
+.lineage-connector + .lineage-node.active {
+  background-color: #3498db;
+}
+
+/* Node details/field lists */
+.node-details {
+  width: 100%;
+  margin-top: 0.75rem;
+  font-size: 0.8rem;
+  text-align: left;
+  position: absolute;
+  top: 100%;
+  width: 160px;
+  padding-top: 0.5rem;
+}
+
+.field-list {
+  list-style-type: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  flex-direction: column;
+}
+
+.field-list li {
+  background-color: rgba(0, 0, 0, 0.05);
+  border-radius: 3px;
+  padding: 0.1rem 0.4rem;
+  font-family: monospace;
+  font-size: 0.7rem;
+}
+
+.field-list li.added {
+  background-color: rgba(46, 204, 113, 0.2);
+  border-left: 2px solid #2ecc71;
+}
+
+.field-list li.renamed {
+  background-color: rgba(52, 152, 219, 0.2);
+  border-left: 2px solid #3498db;
+}
+
+@media (min-width: 992px) {
+  .lineage-graph {
+    flex-direction: row;
+    align-items: flex-start;
+    justify-content: flex-start;
+    overflow-x: auto;
+    padding: 3rem 1.5rem;
+    min-height: 300px;
+  }
+  
+  .lineage-connector {
+    width: 50px;
+    height: 2px;
+    min-width: 20px;
+  }
+  
+  .lineage-node.side-input {
+    top: -70px;
+    right: auto;
+    left: 50%;
+    transform: none;
+  }
+  
+  .side-connector {
+    left: 50%;
+    top: 100%;
+    width: 2px;
+    height: 50px;
+  }
+  
+  .node-details {
+    position: absolute;
+    top: 100%;
+    width: 160px;
+    padding-top: 0.5rem;
+  }
+  
+  .field-list {
+    flex-direction: column;
+  }
+}
+
+/* Enhanced graph animations */
+.lineage-node.active {
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(52, 152, 219, 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 5px rgba(52, 152, 219, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(52, 152, 219, 0);
+  }
+}
+
+/* Placeholder graph */
+.placeholder-graph {
+  height: 300px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.graph-node {
+  padding: 0.75rem 1.5rem;
+  border-radius: 6px;
+  font-weight: 500;
+  margin: 0.5rem 0;
+  z-index: 2;
+  position: relative;
+}
+
+.graph-node.source {
+  background-color: rgba(231, 76, 60, 0.2);
+  border: 2px solid #e74c3c;
+  color: #c0392b;
+}
+
+.graph-node.process {
+  background-color: rgba(52, 152, 219, 0.2);
+  border: 2px solid #3498db;
+  color: #2980b9;
+  transform: scale(0.9);
+  opacity: 0.7;
+  transition: all 0.3s ease;
+}
+
+.graph-node.process.active {
+  transform: scale(1);
+  opacity: 1;
+}
+
+.graph-node.field {
+  background-color: rgba(46, 204, 113, 0.2);
+  border: 2px solid #2ecc71;
+  color: #27ae60;
+}
+
+.graph-node.target {
+  background-color: rgba(155, 89, 182, 0.2);
+  border: 2px solid #9b59b6;
+  color: #8e44ad;
+}
+
+.graph-edge {
+  width: 2px;
+  height: 20px;
+  background-color: #bdc3c7;
+  z-index: 1;
+}
+
+/* Transaction ID display */
+.transaction-id {
+  background-color: #f8f9fa;
+  padding: 0.5rem 1rem;
+  border-radius: 5px;
+  display: flex;
+  align-items: center;
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+  position: sticky;
+  top: 80px;
+  z-index: 90;
+  box-shadow: 0 1px 5px rgba(0,0,0,0.05);
+}
+
+.transaction-id .label {
+  font-weight: 600;
+  color: #6c757d;
+  margin-right: 0.5rem;
+}
+
+.transaction-id .value {
+  color: #495057;
+  font-family: monospace;
+  padding: 0.2rem 0.4rem;
+  background-color: #e9ecef;
+  border-radius: 3px;
+}
+
+.current-step-chip {
+  margin-left: auto;
+  background-color: #3498db;
+  color: white;
+  border-radius: 20px;
+  padding: 0.25rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-size: 0.8rem;
+}
+
+.step-name {
+  font-weight: 600;
+}
+
+.step-department {
+  font-size: 0.7rem;
+  opacity: 0.9;
+}
+
+/* Visualization container */
+.visualization-container {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  height: 800px;  /* Fixed height for the visualization area */
+  background-color: #f9f9f9;
+  border-radius: 8px;
+  box-shadow: inset 0 2px 10px rgba(0,0,0,0.1);
+  margin-bottom: 2rem;
+  user-select: none; /* Prevent text selection during drag */
+}
+
+.visualization-content {
+  position: absolute;
+  padding: 2rem;
+  min-width: 100%;
+  min-height: 100%;
+  transition: transform 0.1s ease;
+  transform: translate(0, 0) scale(1); /* Ensure reset sets to default position and scale */
+}
+
+/* Flow section - top half */
+.flow-section {
+  margin-bottom: 4rem; /* Space between the two graphs */
+  width: 100%;
+}
+
+/* Lineage section - bottom half */
+.lineage-section {
+  width: 100%;
+}
+
+/* Section labels */
+.section-label {
+  font-size: 1.2rem;
+  font-weight: 500;
+  color: #2c3e50;
+  margin-bottom: 1rem;
+  background-color: rgba(255, 255, 255, 0.8);
+  padding: 0.5rem 1rem;
+  border-radius: 5px;
+  display: inline-block;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+/* Visual connections between the two graphs */
+.graph-connections {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.vertical-connection {
+  position: absolute;
+  width: 2px;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.05);
+  transition: background-color 0.3s ease;
+}
+
+.vertical-connection.active {
+  background-color: rgba(52, 152, 219, 0.3);
+}
+
+/* Drag instruction */
+.drag-instruction {
+  position: absolute;
+  bottom: 1rem;
+  right: 1rem;
+  background-color: rgba(0, 0, 0, 0.7);
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 5px;
+  font-size: 0.9rem;
+  animation: fadeInOut 3s ease-in-out forwards;
+}
+
+.drag-instruction i {
+  margin-right: 0.5rem;
+}
+
+@keyframes fadeInOut {
+  0% { opacity: 0; }
+  20% { opacity: 1; }
+  80% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* Reset position button */
+.reset-position-btn {
+  position: fixed;
+  bottom: 1rem;
+  right: 1rem;
+  background-color: rgba(255, 255, 255, 0.9);
+  border: 1px solid #ddd;
+  padding: 0.5rem 1rem;
+  border-radius: 5px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  z-index: 50;
+  transition: background-color 0.2s;
+}
+
+.reset-position-btn:hover {
+  background-color: white;
+}
+
+.reset-position-btn i {
+  margin-right: 0.5rem;
+  color: #3498db;
+}
+
+/* Zoom Controls */
+.zoom-controls {
+  position: fixed;
+  bottom: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 0.5rem;
+  background-color: rgba(255, 255, 255, 0.9);
+  border-radius: 8px;
+  padding: 0.5rem;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  z-index: 50;
+}
+
+.zoom-btn {
+  background-color: white;
+  border: 1px solid #ddd;
+  color: #333;
+  border-radius: 4px;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.zoom-btn:hover {
+  background-color: #f0f0f0;
+  border-color: #aaa;
+}
+
+.zoom-btn:nth-child(2) {
+  width: auto;
+  padding: 0 0.75rem;
+}
+
+/* Completion badge */
+.completion-badge {
+  display: inline-flex;
+  align-items: center;
+  background-color: #2ecc71;
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 5px;
+  font-weight: 500;
+}
+
+.completion-badge i {
+  margin-right: 0.5rem;
+}
+
+.under-main-banner {
+  position: sticky; /* Ensures it sticks to the app-header */
+  top: 0rem; /* Matches the height of the app-header */
+  z-index: 99; /* Ensures it stays above other elements */
+}
+
+/* Add these styles for the risk impact section */
+.risk-impact-section {
+  margin-bottom: 20px;
+  padding: 15px;
+  background-color: #f8f9fa;
+  border-radius: 5px;
+  border-left: 4px solid #5a75db;
+}
+
+.risk-impact-section h4 {
+  color: #333;
+  margin-top: 0;
+  margin-bottom: 15px;
+  font-size: 16px;
+}
+
+.transaction-details {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 15px;
+  font-size: 12px;
+}
+
+.transaction-details p {
+  margin: 0;
+}
+
+.risk-updates h5 {
+  font-size: 14px;
+  margin-top: 10px;
+  margin-bottom: 10px;
+  color: #444;
+}
+
+.risk-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.risk-table th {
+  background-color: #eef0f7;
+  padding: 8px;
+  text-align: left;
+  color: #666;
+  font-weight: 600;
+}
+
+.risk-table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.positive-change {
+  color: #28a745;
+  font-weight: 600;
+}
+
+.negative-change {
+  color: #dc3545;
+  font-weight: 600;
+}
+
+.trend-up {
+  color: #dc3545;
+  font-weight: bold;
+}
+
+.trend-down {
+  color: #28a745;
+  font-weight: bold;
+}
+
+.trend-stable {
+  color: #6c757d;
+  font-weight: bold;
+}
+
+/* Transaction Button Styles */
+.start-transaction-btn {
+  background: linear-gradient(135deg, #4d94ff, #1e56b0);
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 50px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(29, 86, 176, 0.3);
+  min-width: 200px;
+}
+
+.start-transaction-btn:hover {
+  background: linear-gradient(135deg, #5f9dff, #2561c3);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(29, 86, 176, 0.4);
+}
+
+.start-transaction-btn:active {
+  transform: translateY(1px);
+  box-shadow: 0 2px 8px rgba(29, 86, 176, 0.4);
+}
+
+.start-transaction-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.start-transaction-btn i {
+  font-size: 18px;
+}
+
+.transaction-buttons {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Improved Next Step Button */
+.next-step-btn {
+  background: linear-gradient(135deg, #27ae60, #2ecc71);
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 30px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(46, 204, 113, 0.3);
+}
+
+.next-step-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #2ecc71, #27ae60);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 15px rgba(46, 204, 113, 0.4);
+}
+
+.next-step-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  background: linear-gradient(135deg, #95a5a6, #7f8c8d);
+  box-shadow: none;
+}
+
+/* Improved Reset Button */
+.reset-btn {
+  background: #ecf0f1;
+  color: #34495e;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 30px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.reset-btn:hover {
+  background: #d6dbdf;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.reset-btn:active {
+  transform: translateY(1px);
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.1);
+}
+
+/* Improved Completion Badge */
+.completion-badge {
+  background: linear-gradient(135deg, #3498db, #2980b9);
+  color: white;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border-radius: 30px;
+  font-weight: 600;
+  font-size: 14px;
+  box-shadow: 0 4px 12px rgba(52, 152, 219, 0.3);
+}
+
+/* Moving Point Animation */
+.moving-point {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #27ae60, #2ecc71);
+  position: absolute;
+  top: -6px;
+  left: 0;
+  animation: movePointAcross 1s linear forwards;
+  box-shadow: 0 0 10px rgba(46, 204, 113, 0.7);
+}
+
+@keyframes movePointAcross {
+  0% {
+    left: 0;
+    transform: translateX(0);
+    box-shadow: 0 0 8px rgba(46, 204, 113, 0.7);
+  }
+  100% {
+    left: 100%;
+    transform: translateX(-100%);
+    box-shadow: 0 0 8px rgba(46, 204, 113, 0.7);
+  }
+}
+
+/* Initial Connector Animation */
+.initial-connector {
+  position: absolute;
+  left: -60px;
+  top: 50px;
+  width: 60px;
+  height: 2px;
+  background-color: #ddd;
+}
+
+.initial-connector .moving-point {
+  animation: moveFromLeft 1s linear forwards;
+}
+
+@keyframes moveFromLeft {
+  0% {
+    left: 0;
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  100% {
+    left: 60px;
+    opacity: 1;
+  }
+}

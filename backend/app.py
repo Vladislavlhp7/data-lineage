@@ -1,9 +1,9 @@
-from fastapi import FastAPI, UploadFile, File as FastAPIFile, HTTPException, Depends
+from fastapi import FastAPI, UploadFile, File as FastAPIFile, HTTPException, Depends, Query
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import create_engine, Column, Integer, String, Text, ForeignKey, DateTime
+from sqlalchemy import create_engine, Column, Integer, String, Text, ForeignKey, DateTime, func, text
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, relationship
+from sqlalchemy.orm import sessionmaker, relationship, Session
 from pydantic import BaseModel
 import os
 import difflib
@@ -11,7 +11,27 @@ import requests
 import chardet
 from datetime import datetime
 import shutil
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
+import io
+import random
+import docx  # Import for DOCX support
+from dotenv import load_dotenv  # Add this import
+import sqlite3
+import pandas as pd
+
+# Add these imports for transaction simulation
+import uuid
+import time
+from datetime import datetime, timedelta
+import json
+from typing import Dict, List, Any, Optional
+from pydantic import BaseModel
+
+# Import get_db from bank_digital_twin for consistent DB connections
+from bank_digital_twin import get_db as get_trade_db
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Setup FastAPI app
 app = FastAPI(title="Data Lineage API")
@@ -34,7 +54,31 @@ engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
-# Database models
+# Default risk database path
+DEFAULT_RISK_DB_PATH = "./bank_digital_twin.db"
+
+# BCBS 239 related models
+class RiskMetric(BaseModel):
+    risk_type: str
+    value: float
+    rwa: Optional[float] = None
+    trend: Optional[str] = None
+    reporting_date: str
+
+class CapitalRatio(BaseModel):
+    ratio_type: str
+    value: float
+    status: str
+    reporting_date: str
+
+class BCBSSummary(BaseModel):
+    credit_risk_avg: float
+    market_risk_avg: float
+    latest_metrics: List[RiskMetric]
+    capital_ratios: List[CapitalRatio]
+    reporting_date: str
+
+# Database models (Files DB)
 class FileModel(Base):
     __tablename__ = "files"
     id = Column(Integer, primary_key=True, index=True)
@@ -97,18 +141,48 @@ def generate_diff(old_content, new_content):
 
 def summarize_changes(changes):
     """Summarize changes between two versions of a file"""
-    change_text = "\n".join(changes)
+    # Simple summary without using Mistral API
+    if not changes:
+        return "No changes detected."
     
-    # Mistral API call commented out for now
-    # response = requests.post(
-    #     "https://api.mistral.ai/summarize",
-    #     json={"text": change_text},
-    #     headers={"Authorization": "Bearer YOUR_API_KEY"}
-    # )
-    # summary = response.json()
-    # return summary['summary']
+    # Generate a simple summary based on the number and type of changes
+    additions = sum(1 for line in changes if line.startswith('+'))
+    deletions = sum(1 for line in changes if line.startswith('-'))
     
-    return "This is a dummy summary of the changes."
+    if additions == 0 and deletions == 0:
+        return "File was modified but no text content changed."
+    
+    summary_parts = []
+    if additions > 0:
+        summary_parts.append(f"Added {additions} line{'s' if additions != 1 else ''}")
+    if deletions > 0:
+        summary_parts.append(f"Removed {deletions} line{'s' if deletions != 1 else ''}")
+    
+    summary = " and ".join(summary_parts)
+    if len(changes) > 10:
+        summary += ". Substantial changes were made to the file."
+    
+    return summary
+
+def extract_file_content(file_content, filename, encoding='utf-8'):
+    """Extract text content from files of different formats"""
+    # Check file extension
+    _, file_extension = os.path.splitext(filename.lower())
+    
+    if file_extension == '.docx':
+        # Process DOCX file
+        try:
+            doc = docx.Document(io.BytesIO(file_content))
+            return "\n".join([paragraph.text for paragraph in doc.paragraphs])
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Error processing DOCX file: {str(e)}")
+    else:
+        # Process as text file with encoding detection
+        try:
+            detected_encoding = chardet.detect(file_content)['encoding'] or encoding
+            return file_content.decode(detected_encoding)
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Error decoding text file: {str(e)}")
 
 # API Endpoints
 @app.post("/upload")
@@ -116,8 +190,9 @@ async def upload_file(file: UploadFile = FastAPIFile(...), db: SessionLocal = De
     """Upload a new file or a new version of an existing file"""
     try:
         content = await file.read()
-        encoding = chardet.detect(content)['encoding'] or 'utf-8'  # Provide a default encoding
-        content_str = content.decode(encoding)
+        
+        # Extract content based on file type
+        content_str = extract_file_content(content, file.filename)
         
         # Create directory for this file
         file_dir = ensure_file_directory(file.filename)
@@ -125,13 +200,13 @@ async def upload_file(file: UploadFile = FastAPIFile(...), db: SessionLocal = De
         # Check if file with same name already exists
         existing_file = db.query(FileModel).filter(FileModel.filename == file.filename).first()
         
-        if existing_file:
+        if (existing_file):
             # Create new version of existing file
             version_number = existing_file.latest_version + 1
             existing_file.latest_version = version_number
             
             # Save content to version-specific file
-            storage_path = save_file_content(file_dir, version_number, content_str, encoding)
+            storage_path = save_file_content(file_dir, version_number, content_str)
             
             # Create new version record
             new_version = FileVersion(
@@ -149,7 +224,7 @@ async def upload_file(file: UploadFile = FastAPIFile(...), db: SessionLocal = De
             db.flush()  # To get the new file ID
             
             # Save content to version-specific file
-            storage_path = save_file_content(file_dir, 1, content_str, encoding)
+            storage_path = save_file_content(file_dir, 1, content_str)
             
             # Create initial version record
             new_version = FileVersion(
@@ -257,7 +332,7 @@ async def list_files(db: SessionLocal = Depends(get_db)):
             FileVersion.version_number == file.latest_version
         ).first()
         
-        if latest_version:
+        if (latest_version):
             result.append({
                 "id": file.id,
                 "filename": file.filename,
@@ -344,6 +419,841 @@ async def get_file_version(file_id: int, version_number: int, db: SessionLocal =
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error retrieving file version: {str(e)}")
 
-if __name__ == '__main__':
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000, reload=True)
+# Add Transaction Models
+class TransactionStep(BaseModel):
+    id: str
+    name: str
+    department: str
+    description: str
+    
+class TransactionTransformation(BaseModel):
+    field: str
+    action: str
+    description: str
+    
+class TransactionSimulationResponse(BaseModel):
+    step_id: str
+    step_name: str
+    step_index: int
+    department: str
+    description: str
+    current_data: Dict[str, Any]
+    transformations: List[TransactionTransformation]
+    progress: float
+    is_complete: bool
+    next_step: Optional[str] = None
+
+@app.get("/transaction/steps")
+async def get_transaction_steps():
+    """Get all possible transaction processing steps"""
+    return transaction_data["steps"]
+
+@app.get("/transaction/init")
+async def init_transaction():
+    """Initialize a new transaction with random data"""
+    transaction_id = f"T-{uuid.uuid4().hex[:8].upper()}"
+    
+    # Create sample initial transaction data
+    transaction = {
+        "tradeId": transaction_id,
+        "clientId": f"C-{100000 + int(random.random() * 900000)}",
+        "securityId": f"US-{10000 + int(random.random() * 90000)}",
+        "quantity": int(1000 + random.random() * 9000),
+        "price": round(50 + random.random() * 950, 2),
+        "tradeDate": (datetime.now()).strftime("%Y-%m-%d"),
+        "trader": "John Smith"
+    }
+    
+    # Store in memory (would be in database in production)
+    active_transactions[transaction_id] = {
+        "data": transaction,
+        "current_step": 0,
+        "created_at": datetime.now().isoformat()
+    }
+    
+    return {
+        "transaction_id": transaction_id,
+        "initial_data": transaction,
+        "step": 0,
+        "total_steps": len(transaction_data["steps"])  # Use transaction_data["steps"]
+    }
+
+@app.get("/transaction/{transaction_id}/process")
+async def process_transaction_step(transaction_id: str, step_index: int = None):
+    """Process a transaction step"""
+    # Check if transaction exists
+    if transaction_id not in active_transactions:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+    
+    transaction = active_transactions[transaction_id]
+    
+    # If step_index is provided, validate it
+    if step_index is not None:
+        if step_index < 0 or step_index >= len(transaction_data["steps"]):  # Use transaction_data["steps"]
+            raise HTTPException(status_code=400, detail="Invalid step index")
+    else:
+        step_index = transaction["current_step"]
+    
+    # Check if we've reached the end
+    if step_index >= len(transaction_data["steps"]):  # Use transaction_data["steps"]
+        raise HTTPException(status_code=400, detail="Transaction already completed")
+    
+    # Get the current step
+    current_step = transaction_data["steps"][step_index]  # Use transaction_data["steps"]
+    
+    # Apply transformations for this step
+    transformations = transaction_data["transformations"].get(current_step["id"], [])
+    for transform in transformations:
+        field = transform["field"]
+        action = transform["action"]
+        
+        if action == "added":
+            transaction["data"][field] = f"Sample value for {field}"
+        elif action == "renamed":
+            old_field = field.replace("value", "currency")  # Example renaming logic
+            transaction["data"][field] = transaction["data"].pop(old_field, None)
+    
+    # Create the response
+    response = {
+        "step_id": current_step["id"],
+        "step_name": current_step["name"],
+        "step_index": step_index,
+        "department": current_step["department"],
+        "description": current_step["description"],
+        "current_data": transaction["data"],
+        "transformations": transformations,
+        "progress": (step_index + 1) / len(transaction_data["steps"]) * 100,  # Use transaction_data["steps"]
+        "is_complete": step_index == len(transaction_data["steps"]) - 1  # Use transaction_data["steps"]
+    }
+    
+    # If not the last step, increment the current step
+    if step_index < len(transaction_data["steps"]) - 1:  # Use transaction_data["steps"]
+        transaction["current_step"] += 1
+    
+    return response
+
+@app.get("/transaction/{transaction_id}/reset")
+async def reset_transaction(transaction_id: str):
+    """Reset a transaction to the initial state"""
+    # Check if transaction exists
+    if transaction_id not in active_transactions:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+    
+    # Get the basic transaction info and reset to step 0
+    transaction = active_transactions[transaction_id]
+    
+    # Reset to initial step
+    transaction["current_step"] = 0
+    
+    # Reset the data to initial values
+    transaction["data"] = {
+        "tradeId": transaction["data"]["tradeId"],
+        "clientId": transaction["data"]["clientId"],
+        "securityId": transaction["data"]["securityId"],
+        "quantity": transaction["data"]["quantity"],
+        "price": transaction["data"]["price"],
+        "tradeDate": transaction["data"]["tradeDate"],
+        "trader": transaction["data"]["trader"]
+    }
+    
+    return {
+        "message": "Transaction reset successfully",
+        "transaction_id": transaction_id,
+        "current_step": 0,
+        "data": transaction["data"]
+    }
+
+# In-memory storage for active transactions (would use DB in production)
+active_transactions = {}
+
+def apply_transformations(transaction, step_index):
+    """
+    Apply transformations for the given step to the transaction data.
+    """
+    if step_index == 0:  # No transformations for the first step
+        return
+
+    current_step = transaction_data["steps"][step_index]
+    step_id = current_step["id"]
+    transformations = transaction_data["transformations"].get(step_id, [])
+
+    for transform in transformations:
+        field = transform["field"]
+        action = transform["action"]
+
+        if action == "added":
+            # Add new fields based on field name
+            if field == "validation_status":
+                transaction["data"][field] = "Confirmed"
+            elif field == "trade_ref_number":
+                transaction["data"][field] = f"TR-{random.randint(1000, 9999)}"
+            elif field == "settlement_date":
+                trade_date = datetime.strptime(transaction["data"]["tradeDate"], "%Y-%m-%d")
+                settlement_date = trade_date + timedelta(days=3)
+                transaction["data"][field] = settlement_date.strftime("%Y-%m-%d")
+            elif field == "market_data_source":
+                transaction["data"][field] = "S&P Capital IQ"
+            elif field == "bond_yield":
+                transaction["data"][field] = None
+            elif field == "sector":
+                transaction["data"][field] = "Government"
+            elif field == "market_risk_exposure":
+                transaction["data"][field] = round(transaction["data"]["quantity"] * 0.05, 2)
+            elif field == "credit_risk_exposure":
+                transaction["data"][field] = round(transaction["data"]["quantity"] * 0.1, 2)
+            elif field == "settlement_status":
+                transaction["data"][field] = "Pending"
+            elif field == "payment_confirmation":
+                transaction["data"][field] = "Awaiting"
+            elif field == "regulation":
+                transaction["data"][field] = "BCBS 239"
+            elif field == "reported_to":
+                transaction["data"][field] = "European Banking Authority (EBA)"
+            elif field == "report_submission_date":
+                transaction["data"][field] = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
+            elif field == "is_submitted":
+                transaction["data"][field] = False
+        elif action == "renamed":
+            # Handle renamed fields
+            if field == "valueCurrency" and "currency" in transaction["data"]:
+                transaction["data"][field] = transaction["data"]["currency"]
+                del transaction["data"]["currency"]
+
+# Load transaction data from JSON file
+TRANSACTION_FILE = os.path.join(os.path.dirname(__file__), "transactions.json")
+
+def load_transaction_data():
+    try:
+        with open(TRANSACTION_FILE, "r") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        raise RuntimeError(f"Transaction file not found: {TRANSACTION_FILE}")
+    except json.JSONDecodeError as e:
+        raise RuntimeError(f"Invalid JSON in transaction file: {e}")
+
+transaction_data = load_transaction_data()
+
+@app.get("/api/risk/lineage/{risk_type}")
+async def get_risk_lineage(risk_type: str, db: Session = Depends(get_trade_db)):
+    """
+    Get risk lineage data showing how the aggregated risk number is composed from individual transactions
+    """
+    # Check if risk type is valid
+    if risk_type not in ["credit", "market"]:
+        raise HTTPException(status_code=400, detail=f"Invalid risk type: {risk_type}")
+    
+    try:
+        # Map risk type from URL parameter to database field
+        risk_field = f"{risk_type}_risk"
+        risk_type_db = f"{risk_type}_risk_exposure"
+        
+        # Get latest date in risk metrics
+        latest_date_query = text("""
+        SELECT MAX(reporting_date) as latest_date 
+        FROM risk_metrics
+        WHERE risk_type = :risk_type
+        """)
+        latest_date_result = db.execute(latest_date_query, {"risk_type": risk_field}).fetchone()
+        
+        if not latest_date_result or not latest_date_result[0]:
+            raise HTTPException(status_code=404, detail=f"No {risk_type} risk metrics found")
+        
+        reporting_date = latest_date_result[0]
+        
+        # Get the latest risk value
+        risk_value_query = text("""
+        SELECT value
+        FROM risk_metrics
+        WHERE risk_type = :risk_type
+        AND reporting_date = :reporting_date
+        """)
+        risk_value_result = db.execute(risk_value_query, 
+                                      {"risk_type": risk_field, 
+                                       "reporting_date": reporting_date}).fetchone()
+        
+        if not risk_value_result:
+            raise HTTPException(status_code=404, detail=f"No {risk_type} risk value found")
+        
+        aggregated_value = risk_value_result[0] * 1000000  # Convert to dollars (value in millions)
+        
+        # Get contributing transactions from the risk calculation table
+        # Find trades that have risk calculation with the specified risk type
+        trades_query = text(f"""
+        SELECT 
+            te.trade_id,
+            te.asset_class,
+            te.notional_amount,
+            rc.{risk_type_db} as risk_contribution
+        FROM 
+            trade_execution te
+        JOIN 
+            trade_validation tv ON te.id = tv.execution_id
+        JOIN 
+            trade_enrichment tre ON tv.id = tre.validation_id
+        JOIN 
+            risk_calculation rc ON tre.id = rc.enrichment_id
+        WHERE 
+            rc.{risk_type_db} > 0
+        ORDER BY 
+            rc.{risk_type_db} DESC
+        LIMIT 10
+        """)
+        
+        trades_result = db.execute(trades_query).fetchall()
+        
+        transactions = []
+        total_risk_contribution = 0
+        
+        for trade in trades_result:
+            # Calculate the actual risk contribution in dollars
+            risk_contribution = float(trade.risk_contribution)
+            total_risk_contribution += risk_contribution
+            
+            # Add transaction to the list
+            transactions.append({
+                "id": trade.trade_id,
+                "value": float(trade.notional_amount),
+                "riskContribution": risk_contribution,
+                "details": f"{trade.asset_class}, Risk: {risk_contribution:,.2f}"
+            })
+        
+        # If no transactions found or total contribution is 0, generate mock data
+        if not transactions or total_risk_contribution == 0:
+            if risk_type == "credit":
+                aggregated_value = 2850000
+                transactions = [
+                    {"id": "TRX-43290", "value": 750000, "riskContribution": 750000, "details": "Corporate Bond, AA-rated"},
+                    {"id": "TRX-38712", "value": 1200000, "riskContribution": 1200000, "details": "Sovereign Debt, 10Y"},
+                    {"id": "TRX-51087", "value": 900000, "riskContribution": 900000, "details": "Corporate Bond, BBB-rated"}
+                ]
+            else:  # market risk
+                aggregated_value = 1450000
+                transactions = [
+                    {"id": "TRX-29384", "value": 350000, "riskContribution": 350000, "details": "Equity Derivatives"},
+                    {"id": "TRX-31042", "value": 650000, "riskContribution": 650000, "details": "FX Options"},
+                    {"id": "TRX-40287", "value": 450000, "riskContribution": 450000, "details": "Interest Rate Swap"}
+                ]
+        
+        return {
+            "riskType": risk_type,
+            "aggregatedValue": aggregated_value,
+            "transactions": transactions,
+            "reportingDate": reporting_date
+        }
+    except Exception as e:
+        # Log the error and return a fallback for development purposes
+        print(f"Error getting risk lineage: {str(e)}")
+        
+        # Return mock data as fallback
+        if risk_type == "credit":
+            aggregated_value = 2850000
+            transactions = [
+                {"id": "TRX-43290", "value": 750000, "riskContribution": 750000, "details": "Corporate Bond, AA-rated"},
+                {"id": "TRX-38712", "value": 1200000, "riskContribution": 1200000, "details": "Sovereign Debt, 10Y"},
+                {"id": "TRX-51087", "value": 900000, "riskContribution": 900000, "details": "Corporate Bond, BBB-rated"}
+            ]
+        else:  # market risk
+            aggregated_value = 1450000
+            transactions = [
+                {"id": "TRX-29384", "value": 350000, "riskContribution": 350000, "details": "Equity Derivatives"},
+                {"id": "TRX-31042", "value": 650000, "riskContribution": 650000, "details": "FX Options"},
+                {"id": "TRX-40287", "value": 450000, "riskContribution": 450000, "details": "Interest Rate Swap"}
+            ]
+        
+        return {
+            "riskType": risk_type,
+            "aggregatedValue": aggregated_value,
+            "transactions": transactions,
+            "reportingDate": datetime.now().strftime("%Y-%m-%d")
+        }
+
+from bank_digital_twin import promote_trade, generate_sample_trade, get_trade_lineage
+from fastapi import FastAPI, Depends, HTTPException
+from sqlalchemy.orm import Session
+from bank_digital_twin import promote_trade, generate_sample_trade, get_trade_lineage, get_db
+from bank_digital_twin import Base as DigitalTwinBase
+from sqlalchemy import create_engine
+
+# Database configuration
+DATABASE_URL = "sqlite:///./bank_digital_twin.db"
+engine = create_engine(DATABASE_URL)
+DigitalTwinBase.metadata.create_all(bind=engine)
+SessionLocalTwin = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+# Dependency
+def get_trade_db():
+    db = SessionLocalTwin()
+    try:
+        yield db
+    finally:
+        db.close()
+
+@app.post("/api/transaction/create")
+async def create_transaction(db: Session = Depends(get_trade_db)):
+    """
+    Create a new transaction and return its initial data.
+    """
+    try:
+        trade = generate_sample_trade(db)
+        lineage_data = get_trade_lineage(db, trade.trade_id)
+        
+        return {
+            "message": "Transaction created successfully",
+            "trade_id": trade.trade_id,
+            "initial_data": lineage_data,
+            "risk_impact": lineage_data.get("risk_impacts", {})
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error creating transaction: {str(e)}")
+
+
+@app.post("/api/transaction/promote/{trade_id}")
+async def promote_transaction(trade_id: str, db: Session = Depends(get_trade_db)):
+    """
+    Promote a transaction to the next stage.
+    """
+    try:
+        result = promote_trade(db, trade_id)
+        if "error" in result:
+            raise HTTPException(status_code=404, detail=result["error"])
+        
+        return {
+            "message": "Transaction promoted successfully",
+            "updated_data": result,
+            "risk_impact": result.get("risk_impacts", {})
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error promoting transaction: {str(e)}")
+
+# New BCBS 239 API Endpoints using the existing bank_digital_twin database
+@app.get("/bcbs/summary", response_model=BCBSSummary)
+async def get_bcbs_summary(db: Session = Depends(get_trade_db)):
+    """Get BCBS 239 summary including risk metrics and capital ratios"""
+    try:
+        # Execute SQL queries directly using SQLAlchemy connection
+        # Get average credit risk
+        credit_risk_avg_query = text("""
+        SELECT AVG(value) as avg_value 
+        FROM risk_metrics 
+        WHERE risk_type = 'credit_risk'
+        """)
+        credit_risk_avg_result = db.execute(credit_risk_avg_query).fetchone()
+        credit_risk_avg_value = credit_risk_avg_result[0] if credit_risk_avg_result else 0
+        
+        # Get average market risk
+        market_risk_avg_query = text("""
+        SELECT AVG(value) as avg_value 
+        FROM risk_metrics 
+        WHERE risk_type = 'market_risk'
+        """)
+        market_risk_avg_result = db.execute(market_risk_avg_query).fetchone()
+        market_risk_avg_value = market_risk_avg_result[0] if market_risk_avg_result else 0
+        
+        # Get latest date in the database
+        latest_date_query = text("""
+        SELECT MAX(reporting_date) as latest_date 
+        FROM risk_metrics
+        """)
+        latest_date_result = db.execute(latest_date_query).fetchone()
+        reporting_date = latest_date_result[0] if latest_date_result else datetime.now().strftime("%Y-%m-%d")
+        
+        # Get latest risk metrics
+        latest_metrics_query = text("""
+        SELECT risk_type, value, rwa, trend, reporting_date
+        FROM risk_metrics
+        WHERE reporting_date = :reporting_date
+        ORDER BY risk_type
+        """)
+        latest_metrics_rows = db.execute(latest_metrics_query, {"reporting_date": reporting_date}).fetchall()
+        latest_metrics = [
+            RiskMetric(
+                risk_type=row[0],
+                value=row[1],
+                rwa=row[2],
+                trend=row[3],
+                reporting_date=row[4]
+            ) for row in latest_metrics_rows
+        ]
+        
+        # Get capital ratios
+        capital_ratios_query = text("""
+        SELECT ratio_type, value, status, reporting_date
+        FROM capital_ratios
+        WHERE reporting_date = :reporting_date
+        """)
+        capital_ratios_rows = db.execute(capital_ratios_query, {"reporting_date": reporting_date}).fetchall()
+        capital_ratios = [
+            CapitalRatio(
+                ratio_type=row[0],
+                value=row[1],
+                status=row[2],
+                reporting_date=row[3]
+            ) for row in capital_ratios_rows
+        ]
+        
+        return BCBSSummary(
+            credit_risk_avg=round(credit_risk_avg_value, 2),
+            market_risk_avg=round(market_risk_avg_value, 2),
+            latest_metrics=latest_metrics,
+            capital_ratios=capital_ratios,
+            reporting_date=reporting_date
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting BCBS summary: {str(e)}")
+
+@app.get("/bcbs/risk-trends/{risk_type}")
+async def get_risk_trends(risk_type: str, days: int = 30, db: Session = Depends(get_trade_db)):
+    """Get historical trend data for a specific risk type"""
+    try:
+        # Get historical data
+        query = text("""
+        SELECT reporting_date, value, rwa, trend
+        FROM risk_metrics
+        WHERE risk_type = :risk_type
+        ORDER BY reporting_date DESC
+        LIMIT :days
+        """)
+        rows = db.execute(query, {"risk_type": risk_type, "days": days}).fetchall()
+        
+        # Convert to list of dicts
+        trends = [
+            {
+                "reporting_date": row[0],
+                "value": row[1],
+                "rwa": row[2],
+                "trend": row[3]
+            } for row in rows
+        ]
+        
+        return {
+            "risk_type": risk_type,
+            "days": days,
+            "trends": trends
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting risk trends: {str(e)}")
+
+@app.get("/bcbs/risk-sources/{risk_type}")
+async def get_risk_sources(risk_type: str, db: Session = Depends(get_trade_db)):
+    """Get risk sources for a specific risk type on the latest date"""
+    try:
+        # Get latest date
+        latest_date_query = text("""
+        SELECT MAX(reporting_date) as latest_date 
+        FROM risk_metrics
+        WHERE risk_type = :risk_type
+        """)
+        latest_date_result = db.execute(latest_date_query, {"risk_type": risk_type}).fetchone()
+        reporting_date = latest_date_result[0] if latest_date_result else None
+        
+        if not reporting_date:
+            return {"risk_type": risk_type, "sources": []}
+        
+        # Get latest risk metric ID
+        metric_id_query = text("""
+        SELECT id 
+        FROM risk_metrics
+        WHERE risk_type = :risk_type AND reporting_date = :reporting_date
+        LIMIT 1
+        """)
+        metric_result = db.execute(metric_id_query, {"risk_type": risk_type, "reporting_date": reporting_date}).fetchone()
+        
+        if not metric_result:
+            return {"risk_type": risk_type, "sources": []}
+        
+        metric_id = metric_result[0]
+        
+        # Get risk sources
+        sources_query = text("""
+        SELECT source_name, contribution_pct
+        FROM risk_sources
+        WHERE risk_metric_id = :metric_id
+        ORDER BY contribution_pct DESC
+        """)
+        sources_rows = db.execute(sources_query, {"metric_id": metric_id}).fetchall()
+        
+        # Convert to list of dicts
+        sources_list = [{"source": row[0], "contribution": row[1]} for row in sources_rows]
+        
+        return {
+            "risk_type": risk_type,
+            "reporting_date": reporting_date,
+            "sources": sources_list
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting risk sources: {str(e)}")
+
+# Add a new endpoint to reset a transaction
+@app.get("/transaction/{trade_id}/reset")
+async def reset_transaction(trade_id: str, db: Session = Depends(get_trade_db)):
+    """
+    Reset a transaction to its initial state.
+    This is a simplified implementation that creates a new transaction to replace the existing one.
+    """
+    try:
+        # Check if the transaction exists
+        existing_trade = db.query(TradeExecution).filter_by(trade_id=trade_id).first()
+        if not existing_trade:
+            raise HTTPException(status_code=404, detail=f"Transaction {trade_id} not found")
+        
+        # Create a new transaction (reusing the same trade_id would be an alternative)
+        new_trade = generate_sample_trade(db)
+        initial_data = get_trade_lineage(db, new_trade.trade_id)
+        
+        return {
+            "message": "Transaction reset successfully",
+            "trade_id": new_trade.trade_id,
+            "data": initial_data
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error resetting transaction: {str(e)}")
+
+# Add an endpoint to verify if a transaction exists
+@app.get("/api/transaction/{trade_id}/verify")
+async def verify_transaction(trade_id: str, db: Session = Depends(get_trade_db)):
+    """
+    Check if a transaction exists in the database.
+    Returns 200 OK if the transaction exists, 404 Not Found otherwise.
+    """
+    trade = db.query(TradeExecution).filter_by(trade_id=trade_id).first()
+    if not trade:
+        raise HTTPException(status_code=404, detail=f"Transaction {trade_id} not found")
+    
+    return {"exists": True, "trade_id": trade_id}
+
+@app.get("/api/data-lineage/network/{risk_type}")
+async def get_data_lineage_network(risk_type: str, limit: int = 10, db: Session = Depends(get_trade_db)):
+    """
+    Get data lineage for transactions related to a specific risk type formatted as a 2D network.
+    Returns nodes and links suitable for a network visualization.
+    
+    Args:
+        risk_type: Type of risk ('credit' or 'market')
+        limit: Maximum number of transactions to return (default: 10)
+        db: Database session
+        
+    Returns:
+        Network representation with nodes and links
+    """
+    # Check if risk type is valid
+    if risk_type not in ["credit", "market"]:
+        raise HTTPException(status_code=400, detail=f"Invalid risk type: {risk_type}")
+    
+    try:
+        # Map risk type from URL parameter to database field
+        risk_field = f"{risk_type}_risk"
+        risk_type_db = f"{risk_type}_risk_exposure"
+        
+        # Get latest date in risk metrics
+        latest_date_query = text("""
+        SELECT MAX(reporting_date) as latest_date 
+        FROM risk_metrics
+        WHERE risk_type = :risk_type
+        """)
+        latest_date_result = db.execute(latest_date_query, {"risk_type": risk_field}).fetchone()
+        
+        if not latest_date_result or not latest_date_result[0]:
+            raise HTTPException(status_code=404, detail=f"No {risk_type} risk metrics found")
+        
+        reporting_date = latest_date_result[0]
+        
+        # Get the latest risk value
+        risk_value_query = text("""
+        SELECT value
+        FROM risk_metrics
+        WHERE risk_type = :risk_type
+        AND reporting_date = :reporting_date
+        """)
+        risk_value_result = db.execute(risk_value_query, 
+                                     {"risk_type": risk_field, 
+                                      "reporting_date": reporting_date}).fetchone()
+        
+        if not risk_value_result:
+            raise HTTPException(status_code=404, detail=f"No {risk_type} risk value found")
+        
+        aggregated_value = risk_value_result[0] * 1000000  # Convert to dollars (value in millions)
+        
+        # Find trades with significant risk contribution of the specified type
+        trades_query = text(f"""
+        SELECT 
+            te.trade_id,
+            te.asset_class,
+            te.counterparty,
+            te.notional_amount,
+            rc.{risk_type_db} as risk_contribution
+        FROM 
+            trade_execution te
+        JOIN 
+            trade_validation tv ON te.id = tv.execution_id
+        JOIN 
+            trade_enrichment tre ON tv.id = tre.validation_id
+        JOIN 
+            risk_calculation rc ON tre.id = rc.enrichment_id
+        WHERE 
+            rc.{risk_type_db} > 0
+        ORDER BY 
+            rc.{risk_type_db} DESC
+        LIMIT :limit
+        """)
+        
+        trades_result = db.execute(trades_query, {"limit": limit}).fetchall()
+        
+        # Prepare network data
+        nodes = []
+        links = []
+        
+        # Add central risk node
+        central_node = {
+            "id": f"{risk_type}_risk",
+            "label": f"{risk_type.capitalize()} Risk",
+            "type": "risk",
+            "value": round(aggregated_value, 2),
+            "size": 25  # Larger size for central node
+        }
+        nodes.append(central_node)
+        
+        if not trades_result:
+            # Return empty network with just central node
+            return {
+                "riskType": risk_type,
+                "reportingDate": reporting_date,
+                "aggregatedValue": aggregated_value,
+                "nodes": nodes,
+                "links": links
+            }
+        
+        # Calculate total risk contribution for percentage calculation
+        total_risk = sum(float(trade.risk_contribution) for trade in trades_result)
+        
+        # Add nodes and links for each trade
+        for trade in trades_result:
+            trade_id = trade.trade_id
+            risk_contribution = float(trade.risk_contribution)
+            percentage = (risk_contribution / total_risk * 100) if total_risk > 0 else 0
+            
+            # Add transaction node
+            transaction_node = {
+                "id": trade_id,
+                "label": trade_id,
+                "type": "transaction",
+                "assetClass": trade.asset_class,
+                "counterparty": trade.counterparty,
+                "notional": float(trade.notional_amount),
+                "riskContribution": risk_contribution,
+                "percentage": round(percentage, 2),
+                "size": 10 + (percentage / 5)  # Size based on contribution percentage
+            }
+            nodes.append(transaction_node)
+            
+            # Add link from transaction to central risk node
+            link = {
+                "source": trade_id,
+                "target": f"{risk_type}_risk",
+                "value": risk_contribution,
+                "percentage": round(percentage, 2)
+            }
+            links.append(link)
+            
+            # Try to get full trade lineage to add more nodes and links
+            try:
+                lineage = get_trade_lineage(db, trade_id)
+                
+                # Skip if error getting lineage
+                if "error" in lineage:
+                    continue
+                
+                # Add validation node if exists
+                if "trade_validation" in lineage:
+                    validation_id = f"{trade_id}_validation"
+                    validation_node = {
+                        "id": validation_id,
+                        "label": "Validation",
+                        "type": "validation",
+                        "details": lineage["trade_validation"],
+                        "size": 7
+                    }
+                    nodes.append(validation_node)
+                    
+                    # Link from transaction to validation
+                    links.append({
+                        "source": trade_id,
+                        "target": validation_id,
+                        "value": 1
+                    })
+                    
+                    # Add enrichment node if exists
+                    if "trade_enrichment" in lineage:
+                        enrichment_id = f"{trade_id}_enrichment"
+                        enrichment_node = {
+                            "id": enrichment_id,
+                            "label": "Enrichment",
+                            "type": "enrichment", 
+                            "details": lineage["trade_enrichment"],
+                            "size": 7
+                        }
+                        nodes.append(enrichment_node)
+                        
+                        # Link validation to enrichment
+                        links.append({
+                            "source": validation_id,
+                            "target": enrichment_id,
+                            "value": 1
+                        })
+                        
+                        # Add risk calculation node if exists
+                        if "risk_calculation" in lineage:
+                            risk_calc_id = f"{trade_id}_risk_calc"
+                            risk_calc_node = {
+                                "id": risk_calc_id,
+                                "label": "Risk Calculation",
+                                "type": "risk_calculation",
+                                "details": lineage["risk_calculation"],
+                                "size": 7
+                            }
+                            nodes.append(risk_calc_node)
+                            
+                            # Link enrichment to risk calculation
+                            links.append({
+                                "source": enrichment_id,
+                                "target": risk_calc_id, 
+                                "value": 1
+                            })
+                            
+                            # Link risk calculation to central risk
+                            links.append({
+                                "source": risk_calc_id,
+                                "target": f"{risk_type}_risk",
+                                "value": risk_contribution,
+                                "percentage": round(percentage, 2)
+                            })
+                            
+                            # Remove direct link from transaction to risk (we now have the full path)
+                            links = [link for link in links if not (link["source"] == trade_id and link["target"] == f"{risk_type}_risk")]
+            except Exception as e:
+                # Just continue with the simple transaction->risk link
+                print(f"Error getting lineage for {trade_id}: {str(e)}")
+        
+        return {
+            "riskType": risk_type,
+            "reportingDate": reporting_date,
+            "aggregatedValue": aggregated_value,
+            "nodes": nodes,
+            "links": links
+        }
+        
+    except Exception as e:
+        # Log the error
+        print(f"Error creating network for {risk_type} risk: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error creating network visualization: {str(e)}")
+
+# Add a health check endpoint
+@app.get("/health")
+async def health_check():
+    """
+    Simple health check endpoint to verify the API is running
+    """
+    return {
+        "status": "available",
+        "timestamp": datetime.now().isoformat(),
+        "version": "1.0.0"
+    }

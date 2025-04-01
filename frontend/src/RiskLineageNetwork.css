@@ -1,0 +1,331 @@
+/* Root colors for network nodes */
+:root {
+  --risk-color: #e74c3c;
+  --transaction-color: #3498db;
+  --validation-color: #27ae60;
+  --enrichment-color: #f39c12;
+  --risk-calculation-color: #9b59b6;
+}
+
+.risk-network-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(255, 255, 255, 0.97);
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.network-header {
+  background-color: #2c3e50;
+  color: white;
+  padding: 15px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.network-header h2 {
+  margin: 0;
+  font-size: 20px;
+  flex-grow: 1;
+}
+
+.network-meta {
+  display: flex;
+  gap: 20px;
+  font-size: 14px;
+  color: #ecf0f1;
+  margin-right: 20px;
+}
+
+.reporting-date, .total-value {
+  display: flex;
+  align-items: center;
+}
+
+.close-network-btn {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 18px;
+  cursor: pointer;
+  padding: 5px;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+}
+
+.close-network-btn:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.network-content {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.network-visualization {
+  flex: 1;
+  background-color: #f8f9fa;
+  overflow: hidden;
+  position: relative;
+}
+
+.network-visualization svg {
+  width: 100%;
+  height: 100%;
+}
+
+.network-sidebar {
+  width: 300px;
+  background-color: white;
+  border-left: 1px solid #e0e0e0;
+  padding: 20px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* Network Legend */
+.network-legend {
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  padding: 15px;
+  border: 1px solid #e0e0e0;
+}
+
+.network-legend h3 {
+  margin-top: 0;
+  margin-bottom: 12px;
+  font-size: 16px;
+  color: #2c3e50;
+  border-bottom: 1px solid #e0e0e0;
+  padding-bottom: 8px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.legend-color {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  margin-right: 10px;
+}
+
+.legend-color.risk {
+  background-color: var(--risk-color);
+}
+
+.legend-color.transaction {
+  background-color: var(--transaction-color);
+}
+
+.legend-color.validation {
+  background-color: var(--validation-color);
+}
+
+.legend-color.enrichment {
+  background-color: var(--enrichment-color);
+}
+
+.legend-color.risk_calculation {
+  background-color: var(--risk-calculation-color);
+}
+
+.legend-label {
+  font-size: 14px;
+  color: #333;
+}
+
+/* Network Stats */
+.network-stats {
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  padding: 15px;
+  border: 1px solid #e0e0e0;
+}
+
+.network-stats h3 {
+  margin-top: 0;
+  margin-bottom: 12px;
+  font-size: 16px;
+  color: #2c3e50;
+  border-bottom: 1px solid #e0e0e0;
+  padding-bottom: 8px;
+}
+
+.stat-item {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+
+.stat-label {
+  font-weight: 600;
+  color: #555;
+}
+
+.stat-value {
+  color: #2c3e50;
+  font-weight: 500;
+}
+
+/* Node Details */
+.node-details {
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  padding: 15px;
+  border: 1px solid #e0e0e0;
+}
+
+.node-details h3 {
+  margin-top: 0;
+  margin-bottom: 12px;
+  font-size: 16px;
+  color: #2c3e50;
+  border-bottom: 1px solid #e0e0e0;
+  padding-bottom: 8px;
+}
+
+.node-properties {
+  margin-bottom: 15px;
+}
+
+.node-property {
+  margin-bottom: 8px;
+  display: flex;
+  justify-content: space-between;
+  font-size: 14px;
+}
+
+.property-label {
+  font-weight: 600;
+  color: #555;
+  margin-right: 10px;
+}
+
+.property-value {
+  color: #2c3e50;
+  text-align: right;
+  flex: 1;
+}
+
+.clear-selection-btn {
+  background-color: #f1f1f1;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 6px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  margin-top: 10px;
+  transition: background-color 0.2s;
+}
+
+.clear-selection-btn:hover {
+  background-color: #e9e9e9;
+}
+
+/* Loading and Error States */
+.network-loading,
+.network-error {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 300px;
+  font-size: 16px;
+  color: #666;
+  gap: 10px;
+}
+
+.network-error {
+  color: #e74c3c;
+}
+
+/* D3 Network Visualization Styles */
+.node {
+  cursor: pointer;
+}
+
+.node-circle {
+  fill-opacity: 0.8;
+  stroke: white;
+  stroke-width: 1.5px;
+}
+
+.node-circle.risk {
+  fill: var(--risk-color);
+}
+
+.node-circle.transaction {
+  fill: var(--transaction-color);
+}
+
+.node-circle.validation {
+  fill: var(--validation-color);
+}
+
+.node-circle.enrichment {
+  fill: var(--enrichment-color);
+}
+
+.node-circle.risk_calculation {
+  fill: var(--risk-calculation-color);
+}
+
+.node-label {
+  font-size: 12px;
+  pointer-events: none;
+  user-select: none;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+}
+
+.link {
+  stroke: #999;
+  stroke-opacity: 0.4;
+}
+
+.link.risk-transaction,
+.link.transaction-risk {
+  stroke: #666;
+  stroke-opacity: 0.6;
+}
+
+.link-label {
+  font-size: 10px;
+  pointer-events: none;
+  user-select: none;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  fill: #555;
+  font-weight: 600;
+  background: white;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .network-content {
+    flex-direction: column;
+  }
+  
+  .network-sidebar {
+    width: 100%;
+    max-height: 300px;
+    border-left: none;
+    border-top: 1px solid #e0e0e0;
+  }
+} 

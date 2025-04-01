@@ -1,0 +1,66 @@
+{
+  "steps": [
+    {
+      "id": "trade-capture",
+      "name": "Trade Capture",
+      "department": "Front Office",
+      "description": "Initial trade details captured from the trading desk"
+    },
+    {
+      "id": "trade-validation",
+      "name": "Trade Validation",
+      "department": "Middle Office",
+      "description": "Validating trade details against market data and rules"
+    },
+    {
+      "id": "trade-enrichment",
+      "name": "Trade Enrichment",
+      "department": "Middle Office",
+      "description": "Enriching trade with additional market and reference data"
+    },
+    {
+      "id": "risk-calculation",
+      "name": "Risk Calculation",
+      "department": "Risk Management",
+      "description": "Calculating risk metrics for the trade"
+    },
+    {
+      "id": "settlement-preparation",
+      "name": "Settlement Preparation",
+      "department": "Back Office",
+      "description": "Preparing settlement instructions"
+    },
+    {
+      "id": "regulatory-reporting",
+      "name": "Regulatory Reporting",
+      "department": "Compliance",
+      "description": "Preparing data for regulatory reporting"
+    }
+  ],
+  "transformations": {
+    "trade-validation": [
+      { "field": "validation_status", "action": "added", "description": "Validation result status" },
+      { "field": "trade_ref_number", "action": "added", "description": "Reference number for the trade" },
+      { "field": "settlement_date", "action": "added", "description": "Planned settlement date" }
+    ],
+    "trade-enrichment": [
+      { "field": "market_data_source", "action": "added", "description": "Source of market data" },
+      { "field": "bond_yield", "action": "added", "description": "Yield of the bond (if applicable)" },
+      { "field": "sector", "action": "added", "description": "Sector classification of the trade" }
+    ],
+    "risk-calculation": [
+      { "field": "market_risk_exposure", "action": "added", "description": "Exposure to market risk" },
+      { "field": "credit_risk_exposure", "action": "added", "description": "Exposure to credit risk" }
+    ],
+    "settlement-preparation": [
+      { "field": "settlement_status", "action": "added", "description": "Status of settlement preparation" },
+      { "field": "payment_confirmation", "action": "added", "description": "Confirmation of payment readiness" }
+    ],
+    "regulatory-reporting": [
+      { "field": "regulation", "action": "added", "description": "Applicable regulation for reporting" },
+      { "field": "reported_to", "action": "added", "description": "Entity to which the report is submitted" },
+      { "field": "report_submission_date", "action": "added", "description": "Date of report submission" },
+      { "field": "is_submitted", "action": "added", "description": "Whether the report has been submitted" }
+    ]
+  }
+}
